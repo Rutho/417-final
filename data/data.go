@@ -236,9 +236,19 @@ func Send_get(request *Tracker_request, info *Torrent_info) {
 	check(err)
 	_, err = conn.Write(buffer.Bytes())
 	check(err)
-	bun := make([]byte, 5000)
+	bun := make([]byte, 1024)
 	conn.Read(bun)
+	conn.Close()
 	fmt.Println(bun)
+	var got_string string = string(bun[:])
+	ben_start := strings.Index(got_string, "d8")
+	coded := got_string[ben_start:]
+	fmt.Println(coded)
+	into_read := strings.NewReader(coded)
+
+	track_dec, err := bencode.Decode(into_read)
+	print(track_dec)
+
 	/*listener, err := net.Listen("tcp", "localhost:8080")
 	check(err)
 	conn, err = listener.Accept()
