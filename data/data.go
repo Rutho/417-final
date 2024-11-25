@@ -17,10 +17,10 @@ import (
 type Tracker_request struct {
 	Info_hash  []byte
 	Peer_id    []byte
-	Port       uint
-	Uploaded   uint
-	Downloaded uint
-	Left       uint
+	Port       int
+	Uploaded   int
+	Downloaded int
+	Left       int
 	Compact    int
 	No_peer_id int
 	Event      string
@@ -29,7 +29,14 @@ type Tracker_request struct {
 	Key        int
 	Trackerid  int
 }
-
+type Peer struct {
+	ip              string
+	port            int
+	Am_choking      bool
+	Am_interested   bool
+	Peer_choking    bool
+	Peer_interested bool
+}
 type Tracker_response struct {
 	Failure_reason  string
 	Warning_message string
@@ -64,14 +71,16 @@ func check(e error) {
 func Set_torrent_info(file_path string, info *Torrent_info) {
 
 	data, err := os.Open(file_path)
-	check(err)
+	if err != nil {
+		panic("No such file!")
+	}
 	decoded, err := bencode.Decode(data)
 	check(err)
 
 	t_url, ok := decoded["announce"].(string)
 	if ok {
 		info.Announce = t_url
-		regstr := `(\A[a-z][a-z0-9+\-.]*:\/\/)([a-z0-9\-._~%!$&'()*+,;=]+@?[a-z0-9\-._~%]+):(\d{4})*`
+		regstr := `(\A[a-z][a-z0-9+\-.]*:\/\/)([a-z0-9\-._~%!$&'()*+,;=]+@?[a-z0-9\-._~%]+):*(\d{4})*`
 		reg := regexp.MustCompile(regstr)
 		m_list := reg.FindStringSubmatch(info.Announce)
 		info.Track_host = m_list[2]
@@ -159,7 +168,7 @@ func Set_tracker_request(request *Tracker_request, info *Torrent_info) {
 	fmt.Println("encoded host 20 byte", request.Peer_id)
 	request.Uploaded = 0
 	request.Downloaded = 0
-	var file_size uint = 0
+	var file_size int = 0
 	if info.Is_multiple {
 		file_list, ok := info.Info["files"].([]interface{})
 		if !ok {
@@ -172,7 +181,7 @@ func Set_tracker_request(request *Tracker_request, info *Torrent_info) {
 			if !ok {
 				panic("no file lengths")
 			}
-			file_size += uint(tmp)
+			file_size += int(tmp)
 		}
 
 	} else {
@@ -180,7 +189,7 @@ func Set_tracker_request(request *Tracker_request, info *Torrent_info) {
 		if !ok {
 			panic("no length")
 		}
-		file_size = uint(tmp)
+		file_size = int(tmp)
 	}
 	request.Left = file_size
 	request.Event = "started"
@@ -226,12 +235,18 @@ func Send_get(request *Tracker_request, info *Torrent_info) {
 		buffer.WriteString(tmp)
 	}
 	buffer.WriteString(" HTTP/1.1\r\n")
-
-	tmp = fmt.Sprintf("Host: %s:%d\r\n", info.Track_host, info.Track_port)
+	if info.Track_port != 80 {
+		tmp = fmt.Sprintf("Host: %s:%d\r\n", info.Track_host, info.Track_port)
+	} else {
+		tmp = fmt.Sprintf("Host: %s\r\n", info.Track_host)
+	}
 	buffer.WriteString(tmp)
+	buffer.WriteString("Connection: close\r\n")
 	buffer.WriteString("\r\n")
 	fmt.Println(buffer.String())
+
 	tmp = fmt.Sprintf("%s:%d", info.Track_host, info.Track_port)
+
 	conn, err := net.Dial("tcp", tmp)
 	check(err)
 	_, err = conn.Write(buffer.Bytes())
@@ -241,21 +256,9 @@ func Send_get(request *Tracker_request, info *Torrent_info) {
 	conn.Close()
 	fmt.Println(bun)
 	var got_string string = string(bun[:])
-	ben_start := strings.Index(got_string, "d8")
-	coded := got_string[ben_start:]
-	fmt.Println(coded)
-	into_read := strings.NewReader(coded)
 
-	track_dec, err := bencode.Decode(into_read)
-	print(track_dec)
-
-	/*listener, err := net.Listen("tcp", "localhost:8080")
-	check(err)
-	conn, err = listener.Accept()
-	check(err)
-	_, err = conn.Read(bun)
-	check(err)
-	fmt.Println("mung")
-	fmt.Println(bun) */
+	tokend := strings.Split(got_string, "\r\n")
+	fmt.Println(tokend)
+	fmt.Println("test")
 
 }
