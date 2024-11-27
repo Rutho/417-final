@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"client/bencode"
 	"crypto/sha1"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
@@ -30,8 +31,8 @@ type Tracker_request struct {
 	Trackerid  int
 }
 type Peer struct {
-	ip              string
-	port            int
+	Ip              net.IP
+	Port            int
 	Am_choking      bool
 	Am_interested   bool
 	Peer_choking    bool
@@ -45,8 +46,7 @@ type Tracker_response struct {
 	Tracker_id      int
 	Complete        int
 	Incomplete      int
-	Peers           []map[string]interface{}
-	B_peers         string
+	Peers           *[]Peer
 }
 
 type Torrent_info struct {
@@ -62,6 +62,9 @@ type Torrent_info struct {
 	Track_port    int
 }
 
+func (p Peer) String() string {
+	return fmt.Sprintf("%s:%d", p.Ip.String(), p.Port)
+}
 func check(e error) {
 	if e != nil {
 		panic(e)
@@ -153,10 +156,9 @@ func Set_tracker_request(request *Tracker_request, info *Torrent_info) {
 	fmt.Println(pinga)
 	request.Info_hash = make([]byte, len(shh))
 	copy(request.Info_hash[:], []byte(shh))
-	fmt.Println("this not url", string(hsh_info[:]))
-	fmt.Println("this all url and hashed ", string(request.Info_hash[:]))
+
 	hostname, err := os.Hostname()
-	fmt.Println("host", hostname)
+
 	check(err)
 	anyb := make([]byte, 20)
 	enc_name := "-" + hostname + "-"
@@ -165,7 +167,6 @@ func Set_tracker_request(request *Tracker_request, info *Torrent_info) {
 	fin20 := url.QueryEscape(string(anyb[:]))
 	request.Peer_id = make([]byte, len(fin20))
 	copy(request.Peer_id[:], fin20)
-	fmt.Println("encoded host 20 byte", request.Peer_id)
 	request.Uploaded = 0
 	request.Downloaded = 0
 	var file_size int = 0
@@ -197,7 +198,7 @@ func Set_tracker_request(request *Tracker_request, info *Torrent_info) {
 	println("total file size", file_size)
 
 }
-func Send_get(request *Tracker_request, info *Torrent_info) {
+func Send_get(request *Tracker_request, info *Torrent_info, response *Tracker_response) {
 
 	var buffer bytes.Buffer
 	buffer.WriteString("GET /announce")
@@ -243,7 +244,6 @@ func Send_get(request *Tracker_request, info *Torrent_info) {
 	buffer.WriteString(tmp)
 	buffer.WriteString("Connection: close\r\n")
 	buffer.WriteString("\r\n")
-	fmt.Println(buffer.String())
 
 	tmp = fmt.Sprintf("%s:%d", info.Track_host, info.Track_port)
 
@@ -254,11 +254,46 @@ func Send_get(request *Tracker_request, info *Torrent_info) {
 	bun := make([]byte, 1024)
 	conn.Read(bun)
 	conn.Close()
-	fmt.Println(bun)
+
 	var got_string string = string(bun[:])
 
 	tokend := strings.Split(got_string, "\r\n")
-	fmt.Println(tokend)
-	fmt.Println("test")
+
+	tmp_data := strings.NewReader(tokend[len(tokend)-1])
+	ben_data, err := bencode.Decode(tmp_data)
+	check(err)
+
+	interval, ok := ben_data["interval"].(int64)
+	if ok {
+		response.Interval = int(interval)
+	} else {
+		fmt.Println("no interval")
+	}
+
+	peer_string, ok := ben_data["peers"].(string)
+
+	if ok {
+
+		for i := 0; i < len(peer_string); i += 6 {
+			cutoff := i + 6
+			if cutoff > len(peer_string) {
+				cutoff = len(peer_string)
+			}
+			ip_port := peer_string[i:cutoff]
+			ip := net.IP(ip_port[0:4])
+
+			port := binary.BigEndian.Uint16([]byte(ip_port[4:6]))
+
+			var tmp_peer Peer
+			tmp_peer.Ip = ip
+			tmp_peer.Port = int(port)
+			*response.Peers = append(*response.Peers, tmp_peer)
+		}
+
+	}
+	peer_dict, ok := ben_data["peers"].(map[string]interface{})
+	if ok {
+		print(peer_dict)
+	}
 
 }
