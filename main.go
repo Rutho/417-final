@@ -22,7 +22,9 @@ func main() {
 	request_info.Port = *usr_port
 	request_info.Compact = 1
 	request_info.Numwant = 5
+	request_info.Key = "umd123"
 	data.Send_get(request_info, torrent_file, response_info)
+	fmt.Println(request_info, response_info)
 	fmt.Println(torrent_file.Announce)
 	for _, v := range *peer_list {
 		fmt.Println(v.String())

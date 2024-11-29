@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Tracker_request struct {
@@ -27,7 +28,7 @@ type Tracker_request struct {
 	Event      string
 	Ip         string
 	Numwant    int
-	Key        int
+	Key        string
 	Trackerid  int
 }
 type Peer struct {
@@ -37,6 +38,7 @@ type Peer struct {
 	Am_interested   bool
 	Peer_choking    bool
 	Peer_interested bool
+	Peer_id         string
 }
 type Tracker_response struct {
 	Failure_reason  string
@@ -53,13 +55,31 @@ type Torrent_info struct {
 	Is_multiple   bool
 	Info          map[string]interface{}
 	Announce      string
-	Announce_list []string
+	Announce_list []interface{}
 	Creation_date int
 	Comment       string
 	Created_by    string
 	Encoding      string
-	Track_host    string
-	Track_port    int
+}
+
+func Get_http_addr(announce string) (string, int) {
+
+	regstr := `(\A[a-z][a-z0-9+\-.]*:\/\/)([a-z0-9\-._~%!$&'()*+,;=]+@?[a-z0-9\-._~%]+):*(\d{4})*`
+	reg := regexp.MustCompile(regstr)
+	m_list := reg.FindStringSubmatch(announce)
+	var port int
+	var err error
+
+	ip := m_list[2]
+	if m_list[3] != "" {
+		port, err = strconv.Atoi(m_list[3])
+		check(err)
+	} else {
+		port = 80
+	}
+
+	return ip, port
+
 }
 
 func (p Peer) String() string {
@@ -83,21 +103,11 @@ func Set_torrent_info(file_path string, info *Torrent_info) {
 	t_url, ok := decoded["announce"].(string)
 	if ok {
 		info.Announce = t_url
-		regstr := `(\A[a-z][a-z0-9+\-.]*:\/\/)([a-z0-9\-._~%!$&'()*+,;=]+@?[a-z0-9\-._~%]+):*(\d{4})*`
-		reg := regexp.MustCompile(regstr)
-		m_list := reg.FindStringSubmatch(info.Announce)
-		info.Track_host = m_list[2]
-		if m_list[3] != "" {
-			info.Track_port, err = strconv.Atoi(m_list[3])
-			check(err)
-		} else {
-			info.Track_port = 80
-		}
 
 	} else {
 		panic("INVALID TORRENT FILE")
 	}
-	an_list, ok := decoded["announce-list"].([]string)
+	an_list, ok := decoded["announce-list"].([]interface{})
 	if ok {
 		info.Announce_list = an_list
 
@@ -152,6 +162,7 @@ func Set_tracker_request(request *Tracker_request, info *Torrent_info) {
 	hsh_info := h.Sum(nil)
 	fmt.Println(hsh_info)
 	pinga := string(hsh_info[:])
+
 	shh := url.QueryEscape(string(hsh_info[:]))
 	fmt.Println(pinga)
 	request.Info_hash = make([]byte, len(shh))
@@ -227,8 +238,8 @@ func Send_get(request *Tracker_request, info *Torrent_info, response *Tracker_re
 		tmp = fmt.Sprintf("&numwant=%d", request.Numwant)
 		buffer.WriteString(tmp)
 	}
-	if request.Key != 0 {
-		tmp = fmt.Sprintf("&key=%d", request.Key)
+	if request.Key != "" {
+		tmp = fmt.Sprintf("&key=%s", request.Key)
 		buffer.WriteString(tmp)
 	}
 	if request.Trackerid != 0 {
@@ -236,20 +247,54 @@ func Send_get(request *Tracker_request, info *Torrent_info, response *Tracker_re
 		buffer.WriteString(tmp)
 	}
 	buffer.WriteString(" HTTP/1.1\r\n")
-	if info.Track_port != 80 {
-		tmp = fmt.Sprintf("Host: %s:%d\r\n", info.Track_host, info.Track_port)
+
+	var tmp_ip string = "no valid tracker"
+	var tmp_port int = -1
+	tmp_ip, tmp_port = Get_http_addr(info.Announce)
+	dial_val := fmt.Sprintf("%s:%d", tmp_ip, tmp_port)
+	//get a real tmp
+	var conn net.Conn
+	var err error
+	conn, err = net.DialTimeout("tcp", dial_val, time.Second)
+
+	if os.IsTimeout(err) {
+		do_break := false
+
+		for _, outer := range info.Announce_list {
+
+			for _, inner := range outer.([]string) {
+
+				tmp_ip, tmp_port = Get_http_addr(inner)
+				dial_val := fmt.Sprintf("%s:%d", tmp_ip, tmp_port)
+
+				conn, err = net.DialTimeout("tcp", dial_val, time.Second)
+
+				if !(os.IsTimeout(err)) {
+					do_break = true
+					break
+
+				}
+
+			}
+
+			if do_break {
+				break
+			}
+
+		}
+
+	}
+
+	if tmp_port != 80 {
+		tmp = fmt.Sprintf("Host: %s:%d\r\n", tmp_ip, tmp_port)
 	} else {
-		tmp = fmt.Sprintf("Host: %s\r\n", info.Track_host)
+		tmp = fmt.Sprintf("Host: %s\r\n", tmp_ip)
 	}
 	buffer.WriteString(tmp)
 	buffer.WriteString("Connection: close\r\n")
 	buffer.WriteString("\r\n")
-
-	tmp = fmt.Sprintf("%s:%d", info.Track_host, info.Track_port)
-
-	conn, err := net.Dial("tcp", tmp)
-	check(err)
 	_, err = conn.Write(buffer.Bytes())
+	fmt.Println("I SHOULD GET PASST")
 	check(err)
 	bun := make([]byte, 1024)
 	conn.Read(bun)
@@ -291,8 +336,30 @@ func Send_get(request *Tracker_request, info *Torrent_info, response *Tracker_re
 		}
 
 	}
-	peer_dict, ok := ben_data["peers"].(map[string]interface{})
+	peer_dict, ok := ben_data["peers"].([]map[string]interface{})
 	if ok {
+
+		for _, v := range peer_dict {
+
+			var tmp_peer Peer
+			p_id, ok := v["peer id"].(string)
+			if ok {
+				tmp_peer.Peer_id = p_id
+
+			}
+			p_ip, ok := v["ip"].(string)
+			if ok {
+				tmp_peer.Ip = net.ParseIP(p_ip)
+
+			}
+			p_port, ok := v["port"].(int64)
+			if ok {
+				tmp_peer.Port = int(p_port)
+
+			}
+			*response.Peers = append(*response.Peers, tmp_peer)
+		}
+
 		print(peer_dict)
 	}
 
