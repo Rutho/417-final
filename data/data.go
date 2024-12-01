@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"net/url"
 	"os"
@@ -14,6 +15,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+)
+
+type UDP_OR_HTTP int
+
+const (
+	HTTP UDP_OR_HTTP = 0
+	UDP  UDP_OR_HTTP = 1
 )
 
 type Tracker_request struct {
@@ -60,22 +68,52 @@ type Torrent_info struct {
 	Comment       string
 	Created_by    string
 	Encoding      string
+	Tracker_Type  UDP_OR_HTTP
 }
 
-func Get_http_addr(announce string) (string, int) {
+func Event_to_num(event string) int32 {
+
+	if event == "completed" {
+		return 1
+	}
+	if event == "stopped" {
+		return 3
+	}
+	if event == "started" {
+		return 2
+	}
+	if event == "none" {
+		return 0
+	}
+
+	return -1
+
+}
+
+func Get_addr_set_type(announce string, info *Torrent_info) (string, int) {
 
 	regstr := `(\A[a-z][a-z0-9+\-.]*:\/\/)([a-z0-9\-._~%!$&'()*+,;=]+@?[a-z0-9\-._~%]+):*(\d{4})*`
 	reg := regexp.MustCompile(regstr)
 	m_list := reg.FindStringSubmatch(announce)
 	var port int
 	var err error
-
+	if len(m_list) < 3 {
+		info.Tracker_Type = UDP
+		return "none", 0
+	}
 	ip := m_list[2]
 	if m_list[3] != "" {
 		port, err = strconv.Atoi(m_list[3])
 		check(err)
 	} else {
 		port = 80
+	}
+
+	if m_list[1] == "http://" {
+		info.Tracker_Type = HTTP
+
+	} else if m_list[1] == "udp://" {
+		info.Tracker_Type = UDP
 	}
 
 	return ip, port
@@ -105,7 +143,7 @@ func Set_torrent_info(file_path string, info *Torrent_info) {
 		info.Announce = t_url
 
 	} else {
-		panic("INVALID TORRENT FILE")
+		fmt.Println("weird no announce")
 	}
 	an_list, ok := decoded["announce-list"].([]interface{})
 	if ok {
@@ -151,6 +189,10 @@ func Set_torrent_info(file_path string, info *Torrent_info) {
 		info.Is_multiple = true
 	}
 	info.Info = inf_data
+	if info.Announce != "" {
+		Get_addr_set_type(info.Announce, info)
+	}
+
 }
 func Set_tracker_request(request *Tracker_request, info *Torrent_info) {
 
@@ -161,12 +203,9 @@ func Set_tracker_request(request *Tracker_request, info *Torrent_info) {
 	//fmt.Println("this all not hashed ", ben_info)
 	hsh_info := h.Sum(nil)
 	fmt.Println(hsh_info)
-	pinga := string(hsh_info[:])
 
-	shh := url.QueryEscape(string(hsh_info[:]))
-	fmt.Println(pinga)
-	request.Info_hash = make([]byte, len(shh))
-	copy(request.Info_hash[:], []byte(shh))
+	request.Info_hash = make([]byte, len(hsh_info))
+	copy(request.Info_hash[:], hsh_info)
 
 	hostname, err := os.Hostname()
 
@@ -175,9 +214,9 @@ func Set_tracker_request(request *Tracker_request, info *Torrent_info) {
 	enc_name := "-" + hostname + "-"
 	peerby := []byte(enc_name)
 	copy(anyb, peerby)
-	fin20 := url.QueryEscape(string(anyb[:]))
-	request.Peer_id = make([]byte, len(fin20))
-	copy(request.Peer_id[:], fin20)
+
+	request.Peer_id = make([]byte, len(anyb))
+	copy(request.Peer_id[:], anyb)
 	request.Uploaded = 0
 	request.Downloaded = 0
 	var file_size int = 0
@@ -209,14 +248,61 @@ func Set_tracker_request(request *Tracker_request, info *Torrent_info) {
 	println("total file size", file_size)
 
 }
-func Send_get(request *Tracker_request, info *Torrent_info, response *Tracker_response) {
 
+func Send_http(request *Tracker_request, info *Torrent_info, response *Tracker_response) {
+
+	var tmp_ip string = "no valid tracker"
+	var tmp_port int = -1
+	tmp_ip, tmp_port = Get_addr_set_type(info.Announce, info)
+	dial_val := fmt.Sprintf("%s:%d", tmp_ip, tmp_port)
+	//get a real tmp
+	var conn net.Conn
+	var err error
+	var found_valid bool = true
+	conn, err = net.DialTimeout("tcp", dial_val, time.Second)
+
+	if os.IsTimeout(err) || err != nil {
+		found_valid = false
+
+		do_break := false
+
+		for _, outer := range info.Announce_list {
+
+			for _, inner := range outer.([]interface{}) {
+
+				tmp_ip, tmp_port = Get_addr_set_type(inner.(string), info)
+				dial_val := fmt.Sprintf("%s:%d", tmp_ip, tmp_port)
+
+				conn, err = net.DialTimeout("tcp", dial_val, time.Second)
+
+				if !(os.IsTimeout(err)) {
+					found_valid = true
+					do_break = true
+					break
+
+				}
+
+			}
+
+			if do_break {
+				break
+			}
+
+		}
+
+	}
+	if !found_valid {
+		panic("NO VALID CONNECTION")
+	}
 	var buffer bytes.Buffer
 	buffer.WriteString("GET /announce")
 	var tmp string
-	tmp = fmt.Sprintf("?info_hash=%s", request.Info_hash)
+	stinga := url.QueryEscape(string(request.Info_hash))
+	tmp = fmt.Sprintf("?info_hash=%s", stinga)
+
 	buffer.WriteString(tmp)
-	tmp = fmt.Sprintf("&peer_id=%s", strings.TrimRight(string(request.Peer_id[:]), "\x00"))
+	tado := url.QueryEscape(string(request.Peer_id))
+	tmp = fmt.Sprintf("&peer_id=%s", strings.TrimRight(tado[:], "\x00"))
 	buffer.WriteString(tmp)
 	tmp = fmt.Sprintf("&port=%d", request.Port)
 	buffer.WriteString(tmp)
@@ -247,43 +333,6 @@ func Send_get(request *Tracker_request, info *Torrent_info, response *Tracker_re
 		buffer.WriteString(tmp)
 	}
 	buffer.WriteString(" HTTP/1.1\r\n")
-
-	var tmp_ip string = "no valid tracker"
-	var tmp_port int = -1
-	tmp_ip, tmp_port = Get_http_addr(info.Announce)
-	dial_val := fmt.Sprintf("%s:%d", tmp_ip, tmp_port)
-	//get a real tmp
-	var conn net.Conn
-	var err error
-	conn, err = net.DialTimeout("tcp", dial_val, time.Second)
-
-	if os.IsTimeout(err) {
-		do_break := false
-
-		for _, outer := range info.Announce_list {
-
-			for _, inner := range outer.([]string) {
-
-				tmp_ip, tmp_port = Get_http_addr(inner)
-				dial_val := fmt.Sprintf("%s:%d", tmp_ip, tmp_port)
-
-				conn, err = net.DialTimeout("tcp", dial_val, time.Second)
-
-				if !(os.IsTimeout(err)) {
-					do_break = true
-					break
-
-				}
-
-			}
-
-			if do_break {
-				break
-			}
-
-		}
-
-	}
 
 	if tmp_port != 80 {
 		tmp = fmt.Sprintf("Host: %s:%d\r\n", tmp_ip, tmp_port)
@@ -361,6 +410,183 @@ func Send_get(request *Tracker_request, info *Torrent_info, response *Tracker_re
 		}
 
 		print(peer_dict)
+	} else {
+		fmt.Println("NO DATA FROM TRACKER")
+	}
+
+}
+func Send_udp(request *Tracker_request, info *Torrent_info, response *Tracker_response) {
+
+	var tmp_ip string = "no valid tracker"
+	var tmp_port int = -1
+	var dial_val string
+	tmp_ip, tmp_port = Get_addr_set_type(info.Announce, info)
+	dial_val = fmt.Sprintf("%s:%d", tmp_ip, tmp_port)
+	//get a real tmp
+	var conn net.Conn
+	var err error
+
+	conn, err = net.Dial("udp", dial_val)
+
+	if err != nil {
+		panic(err)
+	}
+	var buffer *bytes.Buffer = new(bytes.Buffer)
+	connection_id := int64(0x41727101980)
+	binary.Write(buffer, binary.BigEndian, connection_id)
+	action := int32(0)
+	binary.Write(buffer, binary.BigEndian, action)
+	transaction_id := rand.Int31()
+	binary.Write(buffer, binary.BigEndian, transaction_id)
+	var got_connection bool = false
+	conn.Write(buffer.Bytes())
+	var serv_reply []byte = make([]byte, 16)
+
+	conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+
+	_, err = conn.Read(serv_reply)
+	if err != nil {
+
+		do_break := false
+
+		for _, outer := range info.Announce_list {
+
+			for _, inner := range outer.([]interface{}) {
+
+				tmp_ip, tmp_port = Get_addr_set_type(inner.(string), info)
+				dial_val = fmt.Sprintf("%s:%d", tmp_ip, tmp_port)
+
+				conn, err = net.Dial("udp", dial_val)
+				check(err)
+				conn.Write(buffer.Bytes())
+
+				conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+
+				_, err = conn.Read(serv_reply)
+
+				if err == nil {
+					do_break = true
+					fmt.Println("do we get here")
+					got_connection = true
+					break
+
+				}
+
+			}
+
+			if do_break {
+				break
+			}
+
+		}
+
+	} else {
+		got_connection = true
+
+	}
+
+	if !got_connection {
+		panic("no avalible tracker")
+	}
+	var gotten_transaction_id int32
+
+	r := bytes.NewReader(serv_reply)
+	var temp_byte = make([]byte, 4)
+	r.Read(temp_byte)
+	action = int32(binary.BigEndian.Uint32(temp_byte))
+	temp_byte = make([]byte, 4)
+	r.Read(temp_byte)
+	gotten_transaction_id = int32(binary.BigEndian.Uint32(temp_byte))
+	temp_byte = make([]byte, 8)
+	r.Read(temp_byte)
+	connection_id = int64(binary.BigEndian.Uint64(temp_byte))
+	fmt.Println("waddado")
+	fmt.Println(transaction_id, gotten_transaction_id)
+	fmt.Println("waddado")
+	buffer = new(bytes.Buffer)
+
+	binary.Write(buffer, binary.BigEndian, connection_id)
+	binary.Write(buffer, binary.BigEndian, int32(1))
+	binary.Write(buffer, binary.BigEndian, gotten_transaction_id)
+	binary.Write(buffer, binary.BigEndian, request.Info_hash)
+	fmt.Println(request.Info_hash)
+	binary.Write(buffer, binary.BigEndian, request.Peer_id)
+	binary.Write(buffer, binary.BigEndian, int64(request.Downloaded))
+	binary.Write(buffer, binary.BigEndian, int64(request.Left))
+	binary.Write(buffer, binary.BigEndian, int64(request.Uploaded))
+
+	//binary.Write(buffer, binary.BigEndian, Event_to_num(request.Event))
+	binary.Write(buffer, binary.BigEndian, int32(2))
+	binary.Write(buffer, binary.BigEndian, uint32(0))
+	binary.Write(buffer, binary.BigEndian, uint32(55))
+	to_want := request.Numwant
+	if to_want == 0 {
+		to_want = -1
+	}
+	binary.Write(buffer, binary.BigEndian, int32(to_want))
+	binary.Write(buffer, binary.BigEndian, uint16(request.Port))
+
+	conn.Write(buffer.Bytes())
+	fmt.Println("wowza send")
+	var ann_reply []byte = make([]byte, 1024)
+
+	conn.Read(ann_reply)
+	//action
+	ann_reader := bytes.NewReader(ann_reply)
+	var srv_data int32
+	var srv_bd = make([]byte, 4)
+	ann_reader.Read(srv_bd)
+	srv_data = int32(binary.BigEndian.Uint32(srv_bd))
+	if srv_data != 1 {
+		fmt.Println("ERROR SEND")
+	}
+	//transaction_id
+	srv_bd = make([]byte, 4)
+	ann_reader.Read(srv_bd)
+	srv_data = int32(binary.BigEndian.Uint32(srv_bd))
+	//interval
+	srv_bd = make([]byte, 4)
+	ann_reader.Read(srv_bd)
+	srv_data = int32(binary.BigEndian.Uint32(srv_bd))
+	response.Interval = int(srv_data)
+	//leechers
+	srv_bd = make([]byte, 4)
+	ann_reader.Read(srv_bd)
+	srv_data = int32(binary.BigEndian.Uint32(srv_bd))
+	//seeders
+	srv_bd = make([]byte, 4)
+	ann_reader.Read(srv_bd)
+	srv_data = int32(binary.BigEndian.Uint32(srv_bd))
+
+	for true {
+
+		peer_data := make([]byte, 6)
+
+		ann_reader.Read(peer_data)
+		chk := binary.BigEndian.Uint32(peer_data[0:4])
+		if chk == 0 {
+			break
+		} else {
+			ip_addr := net.IP(peer_data[0:4])
+			port := binary.BigEndian.Uint16(peer_data[4:6])
+			var tmp_peer Peer
+			tmp_peer.Ip = ip_addr
+			tmp_peer.Port = int(port)
+			*response.Peers = append(*response.Peers, tmp_peer)
+		}
+
+	}
+
+}
+
+func Send_get(request *Tracker_request, info *Torrent_info, response *Tracker_response) {
+	info.Tracker_Type = UDP
+	if info.Tracker_Type == HTTP {
+		Send_http(request, info, response)
+
+	} else if info.Tracker_Type == UDP {
+		Send_udp(request, info, response)
+
 	}
 
 }
