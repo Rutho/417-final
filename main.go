@@ -21,7 +21,7 @@ func main() {
 	fmt.Println(torrent_file.Announce)
 	request_info.Port = *usr_port
 	request_info.Compact = 1
-	request_info.Numwant = 5
+	request_info.Numwant = 30
 	request_info.Key = "wow"
 	data.Send_get(request_info, torrent_file, response_info)
 	//fmt.Println(request_info, response_info)

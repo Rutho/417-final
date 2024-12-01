@@ -98,7 +98,7 @@ func Get_addr_set_type(announce string, info *Torrent_info) (string, int) {
 	var port int
 	var err error
 	if len(m_list) < 3 {
-		info.Tracker_Type = UDP
+
 		return "none", 0
 	}
 	ip := m_list[2]
@@ -249,50 +249,19 @@ func Set_tracker_request(request *Tracker_request, info *Torrent_info) {
 
 }
 
-func Send_http(request *Tracker_request, info *Torrent_info, response *Tracker_response) {
+func Send_http(request *Tracker_request, ip string, g_port int, response *Tracker_response) int {
 
 	var tmp_ip string = "no valid tracker"
 	var tmp_port int = -1
-	tmp_ip, tmp_port = Get_addr_set_type(info.Announce, info)
+	tmp_ip, tmp_port = ip, g_port
 	dial_val := fmt.Sprintf("%s:%d", tmp_ip, tmp_port)
 	//get a real tmp
 	var conn net.Conn
 	var err error
-	var found_valid bool = true
+
 	conn, err = net.DialTimeout("tcp", dial_val, time.Second)
-
 	if os.IsTimeout(err) || err != nil {
-		found_valid = false
-
-		do_break := false
-
-		for _, outer := range info.Announce_list {
-
-			for _, inner := range outer.([]interface{}) {
-
-				tmp_ip, tmp_port = Get_addr_set_type(inner.(string), info)
-				dial_val := fmt.Sprintf("%s:%d", tmp_ip, tmp_port)
-
-				conn, err = net.DialTimeout("tcp", dial_val, time.Second)
-
-				if !(os.IsTimeout(err)) {
-					found_valid = true
-					do_break = true
-					break
-
-				}
-
-			}
-
-			if do_break {
-				break
-			}
-
-		}
-
-	}
-	if !found_valid {
-		panic("NO VALID CONNECTION")
+		return 0
 	}
 	var buffer bytes.Buffer
 	buffer.WriteString("GET /announce")
@@ -413,14 +382,15 @@ func Send_http(request *Tracker_request, info *Torrent_info, response *Tracker_r
 	} else {
 		fmt.Println("NO DATA FROM TRACKER")
 	}
+	return 1
 
 }
-func Send_udp(request *Tracker_request, info *Torrent_info, response *Tracker_response) {
+func Send_udp(request *Tracker_request, ip string, g_port int, response *Tracker_response) int {
 
 	var tmp_ip string = "no valid tracker"
 	var tmp_port int = -1
 	var dial_val string
-	tmp_ip, tmp_port = Get_addr_set_type(info.Announce, info)
+	tmp_ip, tmp_port = ip, g_port
 	dial_val = fmt.Sprintf("%s:%d", tmp_ip, tmp_port)
 	//get a real tmp
 	var conn net.Conn
@@ -438,7 +408,7 @@ func Send_udp(request *Tracker_request, info *Torrent_info, response *Tracker_re
 	binary.Write(buffer, binary.BigEndian, action)
 	transaction_id := rand.Int31()
 	binary.Write(buffer, binary.BigEndian, transaction_id)
-	var got_connection bool = false
+
 	conn.Write(buffer.Bytes())
 	var serv_reply []byte = make([]byte, 16)
 
@@ -446,48 +416,9 @@ func Send_udp(request *Tracker_request, info *Torrent_info, response *Tracker_re
 
 	_, err = conn.Read(serv_reply)
 	if err != nil {
-
-		do_break := false
-
-		for _, outer := range info.Announce_list {
-
-			for _, inner := range outer.([]interface{}) {
-
-				tmp_ip, tmp_port = Get_addr_set_type(inner.(string), info)
-				dial_val = fmt.Sprintf("%s:%d", tmp_ip, tmp_port)
-
-				conn, err = net.Dial("udp", dial_val)
-				check(err)
-				conn.Write(buffer.Bytes())
-
-				conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
-
-				_, err = conn.Read(serv_reply)
-
-				if err == nil {
-					do_break = true
-					fmt.Println("do we get here")
-					got_connection = true
-					break
-
-				}
-
-			}
-
-			if do_break {
-				break
-			}
-
-		}
-
-	} else {
-		got_connection = true
-
+		return 0
 	}
 
-	if !got_connection {
-		panic("no avalible tracker")
-	}
 	var gotten_transaction_id int32
 
 	r := bytes.NewReader(serv_reply)
@@ -576,16 +507,53 @@ func Send_udp(request *Tracker_request, info *Torrent_info, response *Tracker_re
 		}
 
 	}
+	return 1
 
 }
 
 func Send_get(request *Tracker_request, info *Torrent_info, response *Tracker_response) {
-	info.Tracker_Type = UDP
-	if info.Tracker_Type == HTTP {
-		Send_http(request, info, response)
 
-	} else if info.Tracker_Type == UDP {
-		Send_udp(request, info, response)
+	tmp_ip, tmp_port := Get_addr_set_type(info.Announce, info)
+	var ret int = 0
+	if tmp_port != 0 {
+
+		if info.Tracker_Type == HTTP {
+			ret = Send_http(request, tmp_ip, tmp_port, response)
+
+		} else if info.Tracker_Type == UDP {
+			ret = Send_udp(request, tmp_ip, tmp_port, response)
+
+		}
+	}
+
+	if ret != 1 {
+		ret = 0
+		do_break := false
+
+		for _, outer := range info.Announce_list {
+
+			for _, inner := range outer.([]interface{}) {
+
+				tmp_ip, tmp_port = Get_addr_set_type(inner.(string), info)
+
+				if info.Tracker_Type == HTTP {
+					ret = Send_http(request, tmp_ip, tmp_port, response)
+
+				} else if info.Tracker_Type == UDP {
+					ret = Send_udp(request, tmp_ip, tmp_port, response)
+				}
+
+				if ret == 1 {
+					do_break = true
+					break
+				}
+
+			}
+			if do_break {
+				break
+			}
+
+		}
 
 	}
 
