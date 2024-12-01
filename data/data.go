@@ -351,6 +351,7 @@ func Send_http(request *Tracker_request, ip string, g_port int, response *Tracke
 			tmp_peer.Ip = ip
 			tmp_peer.Port = int(port)
 			*response.Peers = append(*response.Peers, tmp_peer)
+			fmt.Println(tmp_peer.String())
 		}
 
 	}
