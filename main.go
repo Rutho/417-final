@@ -1,5 +1,7 @@
 package main
 
+//TODO: validate handshake we receive (sane info_hash and peer_id)
+
 import (
 	"client/comms"
 	"client/data"
