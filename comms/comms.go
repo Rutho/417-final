@@ -25,6 +25,7 @@ type Server struct {
 type Packet struct {
 	FromAddress net.IP
 	FromPort    int
+	FromId      string
 	Payload     []byte
 }
 
@@ -35,6 +36,15 @@ type ConnectionState struct {
 	clientId    string
 	infoHash    []byte
 	Conn        *net.Conn
+}
+
+type Message struct {
+	PeerAddress net.IP
+	PeerPort    int
+	PeerId      string
+	msgLength   uint32
+	msgType     MsgType
+	payload     []byte
 }
 
 type MsgType byte
@@ -58,12 +68,6 @@ const (
 	Handshake     MsgType = 11
 )
 
-type Message struct {
-	msgLength uint32
-	msgType   MsgType
-	payload   []byte
-}
-
 // Initializes a server instance and returns a pointer to it
 func NewServer(localPort int, maxPktSize uint32, serverId string, infoHash []byte) *Server {
 	return &Server{
@@ -77,11 +81,14 @@ func NewServer(localPort int, maxPktSize uint32, serverId string, infoHash []byt
 	}
 }
 
-func NewMessage(msgLength uint32, msgType MsgType, payload []byte) *Message {
+func NewMessage(peerAddress net.IP, peerPort int, peerId string, msgLength uint32, msgType MsgType, payload []byte) *Message {
 	return &Message{
-		msgLength: msgLength,
-		msgType:   msgType,
-		payload:   payload,
+		PeerAddress: peerAddress,
+		PeerPort:    peerPort,
+		PeerId:      peerId,
+		msgLength:   msgLength,
+		msgType:     msgType,
+		payload:     payload,
 	}
 }
 
@@ -143,6 +150,9 @@ func (s *Server) acceptLoop() {
 		splitAddressPort := strings.Split((c.RemoteAddr().String()), ":")
 		fromAddressString, fromPortString := splitAddressPort[0], splitAddressPort[1]
 		fromPort, err := strconv.Atoi(fromPortString)
+		if err != nil {
+			fmt.Println("acceptLoop: atoi error:", err)
+		}
 		go func() {
 			conn := NewConnectionState(net.IP(fromAddressString), fromPort, "", s.serverId, s.infoHash, &c)
 			fmt.Printf("established connection with %s\n", c.RemoteAddr())
@@ -162,13 +172,11 @@ func (s *Server) readLoop(conn *ConnectionState) {
 			fmt.Println("read error:", err)
 			continue
 		}
-		if err != nil {
-			fmt.Println("atoi error:", err)
-		}
 
 		s.PktCh <- Packet{
 			FromAddress: conn.PeerAddress,
 			FromPort:    conn.PeerPort,
+			FromId:      conn.PeerId,
 			Payload:     buf[:n],
 		}
 	}
@@ -196,9 +204,12 @@ func (p Packet) PacketPayloadToMessage() *Message {
 		}
 	}
 	return &Message{
-		msgLength: msgLength,
-		msgType:   msgType,
-		payload:   msgPayload,
+		PeerAddress: p.FromAddress,
+		PeerPort:    p.FromPort,
+		PeerId:      p.FromId,
+		msgLength:   msgLength,
+		msgType:     msgType,
+		payload:     msgPayload,
 	}
 }
 
