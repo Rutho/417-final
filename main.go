@@ -1,26 +1,10 @@
 package main
 
 import (
+	"client/comms"
 	"client/data"
-	"client/server"
-	"encoding/binary"
 	"flag"
 	"fmt"
-)
-
-type msgType byte
-
-const (
-	choke         msgType = 0
-	unchoke       msgType = 1
-	interested    msgType = 2
-	notInterested msgType = 3
-	have          msgType = 4
-	bitfield      msgType = 5
-	request       msgType = 6
-	piece         msgType = 7
-	cancel        msgType = 8
-	port          msgType = 9
 )
 
 func main() {
@@ -32,10 +16,6 @@ func main() {
 	var request_info *data.Tracker_request = new(data.Tracker_request)
 	var response_info *data.Tracker_response = new(data.Tracker_response)
 	var peer_list *[]data.Peer = new([]data.Peer)
-	fmt.Println("1")
-	for _, v := range *peer_list {
-		fmt.Println(v.String())
-	}
 	response_info.Peers = peer_list
 	data.Set_torrent_info(*file_p, torrent_file)
 	data.Set_tracker_request(request_info, torrent_file)
@@ -49,41 +29,39 @@ func main() {
 	data.Send_get(request_info, torrent_file, response_info)
 	//fmt.Println(request_info, response_info)
 	fmt.Println(torrent_file.Announce)
+
+	s := comms.NewServer(*usr_port, 2048, string(request_info.Peer_id), request_info.Info_hash)
+	go s.Start()
 	for _, v := range *peer_list {
-		fmt.Println(v.String())
+		conn := comms.NewConnectionState(v.Ip, v.Port, v.Peer_id, string(request_info.Peer_id), request_info.Info_hash, nil)
+		s.EstablishConnection(conn)
 	}
 
-	s := server.New(fmt.Sprintf("127.0.0.1:%d", *usr_port))
-	s.Start()
+	//2048 is a placeholder. Should be substituted by piece length from tracker response
 
-	//This goroutine processes the packets received by the server
-	go func(msgCh chan server.Packet) {
-		for msg := range msgCh {
-			msgLength := msgType(binary.LittleEndian.Uint32(msg.Payload[:4]))
+	//This goroutine processes the packets received by the server (our client)
+	//Function will be moved to another file
+	// go func(pktCh chan comms.Packet) {
+	// 	for pkt := range pktCh {
+	// 		// msg := message.PacketPayloadToMessage(pkt.Payload)
 
-			//Keep alive message
-			if msgLength == 0 {
+	// 		// switch msg {
+	// 		// case message.KeepAlive:
+	// 		// case message.Choke:
+	// 		// case message.Unchoke:
+	// 		// case message.Interested:
+	// 		// case message.NotInterested:
+	// 		// case message.Have:
+	// 		// case message.Bitfield:
+	// 		// case message.Request:
+	// 		// case message.Piece:
+	// 		// case message.Cancel:
+	// 		// case message.Port:
+	// 		// //Invalid message
+	// 		// default:
 
-			}
+	// 		// }
 
-			msgType := msgType(msg.Payload[4])
-
-			switch msgType {
-			case choke:
-			case unchoke:
-			case interested:
-			case notInterested:
-			case have:
-			case bitfield:
-			case request:
-			case piece:
-			case cancel:
-			case port:
-			//Invalid message
-			default:
-
-			}
-
-		}
-	}(s.MsgCh)
+	// 	}
+	// }(s.PktCh)
 }
