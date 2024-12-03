@@ -115,7 +115,7 @@ func (s *Server) Start() {
 	fmt.Printf("Listening on %s\n", s.localAddress)
 
 	go s.acceptLoop()
-
+	
 	<-s.quitCh
 	close(s.PktCh)
 

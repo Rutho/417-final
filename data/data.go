@@ -40,13 +40,15 @@ type Tracker_request struct {
 	Trackerid  int
 }
 type Peer struct {
-	Ip              net.IP
-	Port            int
-	Am_choking      bool
-	Am_interested   bool
-	Peer_choking    bool
-	Peer_interested bool
-	Peer_id         string
+	Ip                net.IP
+	Port              int
+	Am_choking        bool
+	Am_interested     bool
+	Peer_choking      bool
+	Peer_interested   bool
+	Peer_id           string
+	Uploaded_bytes    int
+	Last_time_updated time.Time
 }
 type Tracker_response struct {
 	Failure_reason  string

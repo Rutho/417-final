@@ -7,9 +7,18 @@ import (
 	"client/data"
 	"flag"
 	"fmt"
+	"time"
 )
 
+type LocalPeer struct {
+	peers    []data.Peer
+	top_four []data.Peer
+}
+
 func main() {
+	// Instance of LocalPeer representing our current peer
+	var client LocalPeer
+
 	file_p := flag.String("t", "debian-12.8.0-amd64-DVD-1.iso.torrent", "filepath/name of torrent")
 	usr_port := flag.Int("p", 8080, "port of client")
 	flag.Parse()
@@ -28,6 +37,10 @@ func main() {
 	request_info.Key = "wow"
 	torrent_file.Tracker_Type = data.HTTP
 
+	// set the fields of our client
+	client.peers = *response_info.Peers
+	// TODO[Anthony]: set the top 4 peers field
+
 	data.Send_get(request_info, torrent_file, response_info)
 	//fmt.Println(request_info, response_info)
 	fmt.Println(torrent_file.Announce)
@@ -38,6 +51,13 @@ func main() {
 		conn := comms.NewConnectionState(v.Ip, v.Port, v.Peer_id, string(request_info.Peer_id), request_info.Info_hash, nil)
 		s.EstablishConnection(conn)
 	}
+
+	/*
+		Call Optimistic Unchoking every 30 seconds. Will need to add feature to have this run continously
+	*/
+	time.AfterFunc(30*time.Second, func() {
+		// call optimistic unchoking
+	})
 
 	//2048 is a placeholder. Should be substituted by piece length from tracker response
 
@@ -66,4 +86,8 @@ func main() {
 
 	// 	}
 	// }(s.PktCh)
+}
+
+func OptimisticUnchoking(client *LocalPeer) {
+	
 }
