@@ -47,8 +47,9 @@ type Peer struct {
 	Peer_choking      bool
 	Peer_interested   bool
 	Peer_id           string
-	Uploaded_bytes    int
-	Last_time_updated time.Time
+	Uploaded_bytes    int64
+	Last_time_updated int64
+	Upload_speed      float64
 }
 type Tracker_response struct {
 	Failure_reason  string

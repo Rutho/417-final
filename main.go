@@ -7,12 +7,14 @@ import (
 	"client/data"
 	"flag"
 	"fmt"
+	"math/rand"
+	"sort"
 	"time"
 )
 
 type LocalPeer struct {
-	peers    []data.Peer
-	top_four []data.Peer
+	peers    *[]data.Peer
+	top_four *[]data.Peer
 }
 
 func main() {
@@ -38,7 +40,7 @@ func main() {
 	torrent_file.Tracker_Type = data.HTTP
 
 	// set the fields of our client
-	client.peers = *response_info.Peers
+	client.peers = response_info.Peers
 	// TODO[Anthony]: set the top 4 peers field
 
 	data.Send_get(request_info, torrent_file, response_info)
@@ -53,10 +55,16 @@ func main() {
 	}
 
 	/*
-		Call Optimistic Unchoking every 30 seconds. Will need to add feature to have this run continously
+		Call Optimistic Unchoking every 30 seconds.
+		Calculate the upload rate of every peer every 10 seconds
+		Will need to add feature to have this run continously
 	*/
 	time.AfterFunc(30*time.Second, func() {
-		// call optimistic unchoking
+		OptimisticUnchoking(&client)
+	})
+
+	time.AfterFunc(10*time.Second, func() {
+		CalculateUploadRate(&client)
 	})
 
 	//2048 is a placeholder. Should be substituted by piece length from tracker response
@@ -89,5 +97,58 @@ func main() {
 }
 
 func OptimisticUnchoking(client *LocalPeer) {
-	
+	if len(*client.top_four) == 4 && len(*client.peers) > 4 {
+		// Update the top 4 peers. Latest unchoked peer may be a replacement
+		sort.Slice(*client.peers, func(i, j int) bool {
+			return (*client.peers)[i].Upload_speed < (*client.peers)[j].Upload_speed
+		})
+		first_four := (*client.peers)[:4]
+		client.top_four = &first_four
+
+		// Check for any unchoked peers and choke them. Also generate a list of interested peers
+		var interested_peers []*data.Peer
+		for i := range *client.peers {
+			peer := &(*client.peers)[i]
+			if !contains(*client.top_four, *peer) {
+				if !peer.Am_choking {
+					peer.Am_choking = true
+				}
+				if peer.Am_interested {
+					interested_peers = append(interested_peers, peer)
+				}
+			}
+		}
+		if len(interested_peers) < 1 {
+			fmt.Println("No interested peers to unchoke")
+			return
+		}
+
+		// Randomly unchoke a interested peer
+		interested_peers[rand.Intn(len(interested_peers))].Am_choking = false		
+	}
+}
+
+func contains(top_four []data.Peer, peer data.Peer) bool {
+	for _, v := range top_four {
+		if v.Ip.Equal(peer.Ip) && v.Port == peer.Port {
+			return true
+		}
+	}
+	return false
+}
+
+func CalculateUploadRate(client *LocalPeer) {
+	for i := range *client.peers {
+		peer := &(*client.peers)[i]
+		time_elapsed := time.Now().UnixNano() - peer.Last_time_updated
+		peer.Last_time_updated = time.Now().UnixNano()
+		if(time_elapsed == 0) {
+			fmt.Println("Time elapsed is 0");
+			peer.Uploaded_bytes = 0
+			continue;
+		}
+		upload_speed := float64(peer.Uploaded_bytes) / float64(time_elapsed)
+		peer.Upload_speed = upload_speed
+		peer.Uploaded_bytes = 0
+	}
 }
