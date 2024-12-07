@@ -5,30 +5,37 @@ package main
 import (
 	"client/comms"
 	"client/data"
-	"flag"
 	"fmt"
 	"math/rand"
 	"sort"
 	"time"
+	"client/state"
+	"client/peer"
 )
 
 type LocalPeer struct {
-	peers    *[]data.Peer
-	top_four *[]data.Peer
+	peers    *[]peer.Peer
+	top_four *[]peer.Peer
 }
 
 func main() {
+	var localState state.State
+	localState.ParseClargs()
+	localState.Bitmap.New(50)
+
+	fmt.Println(localState)
+
 	// Instance of LocalPeer representing our current peer
 	var client LocalPeer
 
-	file_p := flag.String("t", "debian-12.8.0-amd64-DVD-1.iso.torrent", "filepath/name of torrent")
-	usr_port := flag.Int("p", 8080, "port of client")
-	flag.Parse()
+	file_p := &localState.TorrentFile
+	usr_port := &localState.Port
+
 	fmt.Println(*file_p, *usr_port)
 	var torrent_file *data.Torrent_info = new(data.Torrent_info)
 	var request_info *data.Tracker_request = new(data.Tracker_request)
 	var response_info *data.Tracker_response = new(data.Tracker_response)
-	var peer_list *[]data.Peer = new([]data.Peer)
+	var peer_list *[]peer.Peer = new([]peer.Peer)
 	response_info.Peers = peer_list
 	data.Set_torrent_info(*file_p, torrent_file)
 	data.Set_tracker_request(request_info, torrent_file)
@@ -106,7 +113,7 @@ func OptimisticUnchoking(client *LocalPeer) {
 		client.top_four = &first_four
 
 		// Check for any unchoked peers and choke them. Also generate a list of interested peers
-		var interested_peers []*data.Peer
+		var interested_peers []*peer.Peer
 		for i := range *client.peers {
 			peer := &(*client.peers)[i]
 			if !contains(*client.top_four, *peer) {
@@ -124,11 +131,11 @@ func OptimisticUnchoking(client *LocalPeer) {
 		}
 
 		// Randomly unchoke a interested peer
-		interested_peers[rand.Intn(len(interested_peers))].Am_choking = false		
+		interested_peers[rand.Intn(len(interested_peers))].Am_choking = false
 	}
 }
 
-func contains(top_four []data.Peer, peer data.Peer) bool {
+func contains(top_four []peer.Peer, peer peer.Peer) bool {
 	for _, v := range top_four {
 		if v.Ip.Equal(peer.Ip) && v.Port == peer.Port {
 			return true

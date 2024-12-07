@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"client/peer"
 )
 
 type UDP_OR_HTTP int
@@ -39,18 +40,6 @@ type Tracker_request struct {
 	Key        string
 	Trackerid  int
 }
-type Peer struct {
-	Ip                net.IP
-	Port              int
-	Am_choking        bool
-	Am_interested     bool
-	Peer_choking      bool
-	Peer_interested   bool
-	Peer_id           string
-	Uploaded_bytes    int64
-	Last_time_updated int64
-	Upload_speed      float64
-}
 type Tracker_response struct {
 	Failure_reason  string
 	Warning_message string
@@ -59,7 +48,7 @@ type Tracker_response struct {
 	Tracker_id      int
 	Complete        int
 	Incomplete      int
-	Peers           *[]Peer
+	Peers           *[]peer.Peer
 }
 
 type Torrent_info struct {
@@ -123,9 +112,6 @@ func Get_addr_set_type(announce string, info *Torrent_info) (string, int) {
 
 }
 
-func (p Peer) String() string {
-	return fmt.Sprintf("%s:%d", p.Ip.String(), p.Port)
-}
 func check(e error) {
 	if e != nil {
 		panic(e)
@@ -350,7 +336,7 @@ func Send_http(request *Tracker_request, ip string, g_port int, response *Tracke
 
 			port := binary.BigEndian.Uint16([]byte(ip_port[4:6]))
 
-			var tmp_peer Peer
+			var tmp_peer peer.Peer
 			tmp_peer.Ip = ip
 			tmp_peer.Port = int(port)
 			*response.Peers = append(*response.Peers, tmp_peer)
@@ -363,7 +349,7 @@ func Send_http(request *Tracker_request, ip string, g_port int, response *Tracke
 
 		for _, v := range peer_dict {
 
-			var tmp_peer Peer
+			var tmp_peer peer.Peer
 			p_id, ok := v["peer id"].(string)
 			if ok {
 				tmp_peer.Peer_id = p_id
@@ -504,7 +490,7 @@ func Send_udp(request *Tracker_request, ip string, g_port int, response *Tracker
 		} else {
 			ip_addr := net.IP(peer_data[0:4])
 			port := binary.BigEndian.Uint16(peer_data[4:6])
-			var tmp_peer Peer
+			var tmp_peer peer.Peer
 			tmp_peer.Ip = ip_addr
 			tmp_peer.Port = int(port)
 			*response.Peers = append(*response.Peers, tmp_peer)
