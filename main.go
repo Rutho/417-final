@@ -13,53 +13,57 @@ import (
 	"client/peer"
 )
 
-type LocalPeer struct {
-	peers    *[]peer.Peer
-	top_four *[]peer.Peer
-}
-
 func main() {
 	var localState state.State
 	localState.ParseClargs()
+
+	// Initialize the bitmap to a TODO placeholder length of 50 pieces
 	localState.Bitmap.New(50)
 
-	fmt.Println(localState)
-
-	// Instance of LocalPeer representing our current peer
-	var client LocalPeer
-
-	file_p := &localState.TorrentFile
-	usr_port := &localState.Port
-
-	fmt.Println(*file_p, *usr_port)
+	// --------
+	// Get data from the tracker
+	// --------
 	var torrent_file *data.Torrent_info = new(data.Torrent_info)
 	var request_info *data.Tracker_request = new(data.Tracker_request)
 	var response_info *data.Tracker_response = new(data.Tracker_response)
-	var peer_list *[]peer.Peer = new([]peer.Peer)
-	response_info.Peers = peer_list
-	data.Set_torrent_info(*file_p, torrent_file)
+	response_info.Peers = new([]peer.Peer)
+	data.Set_torrent_info(localState.TorrentFile, torrent_file)
 	data.Set_tracker_request(request_info, torrent_file)
 	fmt.Println(torrent_file.Announce)
-	request_info.Port = *usr_port
+	request_info.Port = localState.Port
 	request_info.Compact = 1
 	request_info.Numwant = 30
 	request_info.Key = "wow"
 	torrent_file.Tracker_Type = data.HTTP
-
-	// set the fields of our client
-	client.peers = response_info.Peers
-	// TODO[Anthony]: set the top 4 peers field
-
 	data.Send_get(request_info, torrent_file, response_info)
-	//fmt.Println(request_info, response_info)
+
+	// --------
+	// Store the peer list into the State struct
+	// --------
+	for _, p := range *response_info.Peers {
+		localState.Peers = append(localState.Peers, p) // deep copy
+	}
+
+	// --------
+	// Pick 4 random peers to be the Top4
+	// --------
+	random := rand.Perm(len(localState.Peers))
+	for i := 0; i < len(localState.Peers) && i < 4; i++ {
+		localState.Top4 = append(localState.Top4, &localState.Peers[random[i]])
+	}
+
+	fmt.Println(localState)
+
 	fmt.Println(torrent_file.Announce)
 
-	s := comms.NewServer(*usr_port, 2048, string(request_info.Peer_id), request_info.Info_hash)
+	s := comms.NewServer(localState.Port, 2048, string(request_info.Peer_id), request_info.Info_hash)
 	go s.Start()
-	for _, v := range *peer_list {
+	for _, v := range localState.Peers {
 		conn := comms.NewConnectionState(v.Ip, v.Port, v.Peer_id, string(request_info.Peer_id), request_info.Info_hash, nil)
 		s.EstablishConnection(conn)
 	}
+
+	fmt.Println("Hello!!!")
 
 	/*
 		Call Optimistic Unchoking every 30 seconds.
@@ -67,11 +71,13 @@ func main() {
 		Will need to add feature to have this run continously
 	*/
 	time.AfterFunc(30*time.Second, func() {
-		OptimisticUnchoking(&client)
+		fmt.Println("OptimisticUnchoking()")
+		OptimisticUnchoking(&localState)
 	})
 
 	time.AfterFunc(10*time.Second, func() {
-		CalculateUploadRate(&client)
+		fmt.Println("CalculateUploadRate()")
+		CalculateUploadRate(&localState)
 	})
 
 	//2048 is a placeholder. Should be substituted by piece length from tracker response
@@ -103,25 +109,27 @@ func main() {
 	// }(s.PktCh)
 }
 
-func OptimisticUnchoking(client *LocalPeer) {
-	if len(*client.top_four) == 4 && len(*client.peers) > 4 {
+func OptimisticUnchoking(localState *state.State) {
+	if len(localState.Top4) == 4 && len(localState.Peers) > 4 {
 		// Update the top 4 peers. Latest unchoked peer may be a replacement
-		sort.Slice(*client.peers, func(i, j int) bool {
-			return (*client.peers)[i].Upload_speed < (*client.peers)[j].Upload_speed
+		sort.Slice(localState.Peers, func(i, j int) bool {
+			return (localState.Peers)[i].Upload_speed < (localState.Peers)[j].Upload_speed
 		})
-		first_four := (*client.peers)[:4]
-		client.top_four = &first_four
+		// Top4 stores pointers to Peer
+		localState.Top4[0] = &localState.Peers[0]
+		localState.Top4[1] = &localState.Peers[1]
+		localState.Top4[2] = &localState.Peers[2]
+		localState.Top4[3] = &localState.Peers[3]
 
 		// Check for any unchoked peers and choke them. Also generate a list of interested peers
 		var interested_peers []*peer.Peer
-		for i := range *client.peers {
-			peer := &(*client.peers)[i]
-			if !contains(*client.top_four, *peer) {
+		for _, peer := range localState.Peers {
+			if !contains(localState.Top4, &peer) {
 				if !peer.Am_choking {
 					peer.Am_choking = true
 				}
 				if peer.Am_interested {
-					interested_peers = append(interested_peers, peer)
+					interested_peers = append(interested_peers, &peer)
 				}
 			}
 		}
@@ -135,18 +143,17 @@ func OptimisticUnchoking(client *LocalPeer) {
 	}
 }
 
-func contains(top_four []peer.Peer, peer peer.Peer) bool {
+func contains(top_four []*peer.Peer, p *peer.Peer) bool {
 	for _, v := range top_four {
-		if v.Ip.Equal(peer.Ip) && v.Port == peer.Port {
+		if v.Ip.Equal(p.Ip) && v.Port == p.Port {
 			return true
 		}
 	}
 	return false
 }
 
-func CalculateUploadRate(client *LocalPeer) {
-	for i := range *client.peers {
-		peer := &(*client.peers)[i]
+func CalculateUploadRate(localState *state.State) {
+	for _, peer := range localState.Peers {
 		time_elapsed := time.Now().UnixNano() - peer.Last_time_updated
 		peer.Last_time_updated = time.Now().UnixNano()
 		if(time_elapsed == 0) {

@@ -61,7 +61,7 @@ func (s State) String() string {
         if (i == 0) {
             output += fmt.Sprintf("%s", peer)
         } else {
-            output += fmt.Sprintf(", %s", peer)
+            output += fmt.Sprintf(",\n |                 %s", peer)
         }
     }
     output += "]\n"
@@ -71,7 +71,7 @@ func (s State) String() string {
         if (i == 0) {
             output += fmt.Sprintf("%s", peer)
         } else {
-            output += fmt.Sprintf(", %s", peer)
+            output += fmt.Sprintf(",\n |                 %s", peer)
         }
     }
     output += "]\n"
@@ -83,25 +83,25 @@ func (s State) String() string {
 
 
 
-// Description:
-//
-//   method on the State struct to parse command-line arguments
-//
-// Parameters:
-//
-//   none
-//
-// Returns:
-//
-//   nothing
-//
-// Example usage:
-//
-//   var localState State
-//   localState.ParseClargs()
-//   fmt.Println(localState)
-//
 func (s *State) ParseClargs() {
+    // Description:
+    //
+    //   method on the State struct to parse command-line arguments
+    //
+    // Parameters:
+    //
+    //   none
+    //
+    // Returns:
+    //
+    //   nothing
+    //
+    // Example usage:
+    //
+    //   var localState State
+    //   localState.ParseClargs()
+    //   fmt.Println(localState)
+
     // Define -t <torrent file>
     // Default value "debian-12.8.0-amd64-DVD-1.iso.torrent"
     s.TorrentFile = *flag.String("t", "debian-12.8.0-amd64-DVD-1.iso.torrent", "filepath/name of torrent file")
