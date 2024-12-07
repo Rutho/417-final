@@ -6,31 +6,8 @@ import (
     "fmt"         // https://pkg.go.dev/fmt
     "flag"        // https://pkg.go.dev/flag
     "client/bitmap"
+    "client/peer"
 )
-
-
-
-type Peer struct {
-	// Description:
-	//
-	//   structure that stores information about other peers
-	//
-	// Fields:
-	//
-	//   ip              : ip address
-	//   port            : port
-	//   Am_choking      : TODO
-	//   Am_interested   : TODO
-	//   Peer_choking    : TODO
-	//   Peer_interested : TODO
-
-	ip              string
-	port            int
-	Am_choking      bool
-	Am_interested   bool
-	Peer_choking    bool
-	Peer_interested bool
-}
 
 
 
@@ -49,8 +26,8 @@ type State struct {
 
     TorrentFile   string
     Port          int
-    Peers         []Peer
-    Top4          []*Peer
+    Peers         []peer.Peer
+    Top4          []*peer.Peer
     Bitmap        bitmap.Bitmap
 }
 
