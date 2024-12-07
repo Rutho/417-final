@@ -8,6 +8,7 @@ import (
     "client/bitmap"
     "client/peer"
     "math/rand"
+    "net"
 )
 
 
@@ -20,6 +21,7 @@ type State struct {
     // Fields:
     //
     //   TorrentFile  : name of torrent file in the current directory
+    //   IP      : IP address of the local machine
     //   Port    : port that this client will run on
     //   ID      : unique 20-byte string identifier for use in tracker requests and peer handshakes.
     //   Peers   : all the peers known to the local client (excluding self)
@@ -27,6 +29,7 @@ type State struct {
     //   bitmap  : represents which pieces of the file being downloaded have been received
 
     TorrentFile   string
+    IP            net.IP
     Port          int
     ID            string
     Peers         []peer.Peer
@@ -57,6 +60,7 @@ func (s State) String() string {
 
     var output string = "State:\n"
     output += fmt.Sprintf(" |  TorrentFile : %s\n", s.TorrentFile)
+    output += fmt.Sprintf(" |  IP          : %s\n", s.IP.String())
     output += fmt.Sprintf(" |  Port        : %d\n", s.Port)
     output += fmt.Sprintf(" |  ID          : %s\n", s.ID)
 
@@ -152,4 +156,7 @@ func (s *State) GenerateID() string {
 
     return s.ID
 }
+
+
+
 

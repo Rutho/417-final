@@ -11,6 +11,7 @@ import (
 	"time"
 	"client/state"
 	"client/peer"
+	"net"
 )
 
 func main() {
@@ -43,6 +44,9 @@ func main() {
 	// --------
 	// Initialize State
 	// --------
+
+	// Initialize the IP address
+	localState.IP = net.ParseIP("127.0.0.1")
 
 	// Initialize the bitmap
 	localState.Bitmap.New(50) // TODO placeholder length of 50 pieces
