@@ -16,7 +16,16 @@ type Peer struct {
     //
     // Fields:
     //
-    //   TODO
+    //   Ip                : IP address
+    //   Port              : port
+    //   Am_choking        :
+    //   Am_interested     :
+    //   Peer_choking      :
+    //   Peer_interested   :
+    //   Peer_id           : 20-byte string unique ID. Optionally the same peer_id that is transmitted in tracker requests
+    //   Uploaded_bytes    : int64
+    //   Last_time_updated : int64
+    //   Upload_speed      : float64
 
     Ip                net.IP
     Port              int

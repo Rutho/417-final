@@ -14,11 +14,14 @@ import (
 )
 
 func main() {
-	var localState state.State
-	localState.ParseClargs()
+	// Seed the random number generator
+	rand.Seed(time.Now().UTC().UnixNano())
 
-	// Initialize the bitmap to a TODO placeholder length of 50 pieces
-	localState.Bitmap.New(50)
+	// Create a State object
+	var localState state.State
+
+	// Parse command line arguments
+	localState.ParseClargs()
 
 	// --------
 	// Get data from the tracker
@@ -38,20 +41,27 @@ func main() {
 	data.Send_get(request_info, torrent_file, response_info)
 
 	// --------
-	// Store the peer list into the State struct
+	// Initialize State
 	// --------
+
+	// Initialize the bitmap
+	localState.Bitmap.New(50) // TODO placeholder length of 50 pieces
+
+	// Generate an ID
+	localState.GenerateID()
+
+	// Store the peer list into the State struct
 	for _, p := range *response_info.Peers {
 		localState.Peers = append(localState.Peers, p) // deep copy
 	}
 
-	// --------
 	// Pick 4 random peers to be the Top4
-	// --------
 	random := rand.Perm(len(localState.Peers))
 	for i := 0; i < len(localState.Peers) && i < 4; i++ {
 		localState.Top4 = append(localState.Top4, &localState.Peers[random[i]])
 	}
 
+	// Print the State struct
 	fmt.Println(localState)
 
 	fmt.Println(torrent_file.Announce)

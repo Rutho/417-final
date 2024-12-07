@@ -7,6 +7,7 @@ import (
     "flag"        // https://pkg.go.dev/flag
     "client/bitmap"
     "client/peer"
+    "math/rand"
 )
 
 
@@ -19,13 +20,15 @@ type State struct {
     // Fields:
     //
     //   TorrentFile  : name of torrent file in the current directory
-    //   Port   : port that this client will run on
-    //   Peers  : all the peers known to the local client (excluding self)
-    //   Top4   : pointers to the top4 peers
-    //   bitmap : represents which pieces of the file being downloaded have been received
+    //   Port    : port that this client will run on
+    //   ID      : unique 20-byte string identifier for use in tracker requests and peer handshakes.
+    //   Peers   : all the peers known to the local client (excluding self)
+    //   Top4    : pointers to the top4 peers
+    //   bitmap  : represents which pieces of the file being downloaded have been received
 
     TorrentFile   string
     Port          int
+    ID            string
     Peers         []peer.Peer
     Top4          []*peer.Peer
     Bitmap        bitmap.Bitmap
@@ -55,6 +58,7 @@ func (s State) String() string {
     var output string = "State:\n"
     output += fmt.Sprintf(" |  TorrentFile : %s\n", s.TorrentFile)
     output += fmt.Sprintf(" |  Port        : %d\n", s.Port)
+    output += fmt.Sprintf(" |  ID          : %s\n", s.ID)
 
     output += " |  Peers       : ["
     for i, peer := range s.Peers {
@@ -116,5 +120,36 @@ func (s *State) ParseClargs() {
 
 
 
+func (s *State) GenerateID() string {
+    // Description:
+    //
+    //   method on the State struct to generate a unique 20-byte ID
+    //
+    // Parameters:
+    //
+    //   none
+    //
+    // Returns:
+    //
+    //   a string of length 20 chars, representing the ID
+    //
+    // Example usage:
+    //
+    //   var localState State
+    //   localState.GenerateID()
+    //   fmt.Println(localState)
 
+    // RFRA : name of our BitTorrent client
+    // 00   : version number of our BitTorrent client
+    s.ID = "-RFRA00-"
+
+    // Random
+    chars := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+    for i := len(s.ID); i < 20; i++ {
+        s.ID = s.ID + string(chars[rand.Intn(len(chars))])
+    }
+
+    return s.ID
+}
 
