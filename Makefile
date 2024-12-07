@@ -12,7 +12,8 @@ all: build
 .PHONY: build
 build:
 	mkdir -p $(BUILD_DIR)
-	go build -o $(BUILD_DIR)/$(APP_NAME) $(MAIN_FILE)
+	cd $(BUILD_DIR)
+	go build -o $(APP_NAME) $(MAIN_FILE)
 
 # Run the application
 .PHONY: run

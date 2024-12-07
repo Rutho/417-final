@@ -115,7 +115,7 @@ func (s *Server) Start() {
 	fmt.Printf("Listening on %s\n", s.localAddress)
 
 	go s.acceptLoop()
-	
+
 	<-s.quitCh
 	close(s.PktCh)
 
@@ -123,11 +123,11 @@ func (s *Server) Start() {
 }
 
 // Establishes a TCP connection and initiates BitTorrent handshake (active open)
-func (s *Server) EstablishConnection(conn *ConnectionState) {
+func (s *Server) EstablishConnection(conn *ConnectionState) error {
 	c, err := net.Dial("tcp", fmt.Sprintf("%s:%d", conn.PeerAddress, conn.PeerPort))
 	if err != nil {
 		fmt.Println("EstablishConnection: dial error:", err)
-		return
+		return err
 	}
 
 	conn.Conn = &c
@@ -138,6 +138,7 @@ func (s *Server) EstablishConnection(conn *ConnectionState) {
 		//If it went well, send connection state to connCh and let another goroutine handle processing that
 		s.readLoop(conn)
 	}()
+	return nil
 }
 
 func (s *Server) acceptLoop() {
@@ -164,13 +165,14 @@ func (s *Server) acceptLoop() {
 
 // Reads packets received from the given connection
 // Writes the packet + metadata (based on Packet struct) to the msg channel
-func (s *Server) readLoop(conn *ConnectionState) {
+func (s *Server) readLoop(conn *ConnectionState) error {
 	buf := make([]byte, int32(math.Pow(2, 14)))
 	for {
 		n, err := (*conn.Conn).Read(buf)
 		if err != nil {
 			fmt.Println("read error:", err)
-			continue
+			(*conn.Conn).Close()
+			return err
 		}
 
 		s.PktCh <- Packet{
@@ -218,23 +220,51 @@ func (p Packet) PacketPayloadToMessage() *Message {
 // Otherwise, if we aren't the connection initiator, we wait for a handshake from the other side
 // before sending a handshake back.
 func (conn *ConnectionState) TwoWayHandshake(pstr string, initiator bool) error {
-	sendHandshake := func() {
-		fmt.Fprintf(*conn.Conn, "\x13BitTorrent protocol\x00\x00\x00\x00\x00\x00\x00\x00%s%s", conn.infoHash, conn.clientId)
+	sendHandshake := func() error {
+		_, err := fmt.Fprintf(*conn.Conn, "\x13BitTorrent protocol\x00\x00\x00\x00\x00\x00\x00\x00%s%s",
+			conn.infoHash, conn.clientId)
+		if err != nil {
+			fmt.Println("sendHandshake: fprintf error:", err)
+			return err
+		}
+		return nil
 	}
-	receiveHandshake := func() {
-		handshakePacketSize := 68
-		buf := make([]byte, handshakePacketSize)
-		_, err := (*conn.Conn).Read(buf)
+	receiveHandshake := func() error {
+		pstrlen := make([]byte, 1)
+		_, err := (*conn.Conn).Read(pstrlen)
 		if err != nil {
 			fmt.Println("read error:", err)
+			return err
 		}
+		//-1 since we've the read single pstrlen byte
+		handshakePacketSize := 49 + uint8(pstrlen[0]) - 1
+		buf := make([]byte, handshakePacketSize)
+		_, err = (*conn.Conn).Read(buf)
+		//TODO: check if info_hash is the same.
+		if err != nil {
+			fmt.Println("read error:", err)
+			return err
+		}
+		return nil
 	}
 	if initiator {
-		sendHandshake()
-		receiveHandshake()
+		err := sendHandshake()
+		if err != nil {
+			return err
+		}
+		err = receiveHandshake()
+		if err != nil {
+			return err
+		}
 	} else {
-		receiveHandshake()
-		sendHandshake()
+		err := receiveHandshake()
+		if err != nil {
+			return err
+		}
+		err = sendHandshake()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

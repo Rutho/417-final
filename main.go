@@ -5,13 +5,13 @@ package main
 import (
 	"client/comms"
 	"client/data"
+	"client/peer"
+	"client/state"
 	"fmt"
 	"math/rand"
+	"net"
 	"sort"
 	"time"
-	"client/state"
-	"client/peer"
-	"net"
 )
 
 func main() {
@@ -55,10 +55,33 @@ func main() {
 	localState.GenerateID()
 
 	// Store the peer list into the State struct
+	// --------
+
+	s := comms.NewServer(localState.Port, 2048, string(request_info.Peer_id), request_info.Info_hash)
+	go s.Start()
+
+	establishCh := make(chan peer.Peer, 50)
 	for _, p := range *response_info.Peers {
-		localState.Peers = append(localState.Peers, p) // deep copy
+		go func(peer peer.Peer) {
+			conn := comms.NewConnectionState(peer.Ip, peer.Port, peer.Peer_id, string(request_info.Peer_id),
+				request_info.Info_hash, nil)
+			err := s.EstablishConnection(conn)
+			if err == nil {
+				establishCh <- peer
+			}
+		}(p)
+		// deep copy
 	}
 
+	go func() {
+		for {
+			connectedPeer := <-establishCh
+			localState.Peers = append(localState.Peers, connectedPeer)
+		}
+	}()
+
+	time.Sleep(10000000000)
+	// --------
 	// Pick 4 random peers to be the Top4
 	random := rand.Perm(len(localState.Peers))
 	for i := 0; i < len(localState.Peers) && i < 4; i++ {
@@ -69,13 +92,6 @@ func main() {
 	fmt.Println(localState)
 
 	fmt.Println(torrent_file.Announce)
-
-	s := comms.NewServer(localState.Port, 2048, string(request_info.Peer_id), request_info.Info_hash)
-	go s.Start()
-	for _, v := range localState.Peers {
-		conn := comms.NewConnectionState(v.Ip, v.Port, v.Peer_id, string(request_info.Peer_id), request_info.Info_hash, nil)
-		s.EstablishConnection(conn)
-	}
 
 	fmt.Println("Hello!!!")
 
@@ -93,34 +109,6 @@ func main() {
 		fmt.Println("CalculateUploadRate()")
 		CalculateUploadRate(&localState)
 	})
-
-	//2048 is a placeholder. Should be substituted by piece length from tracker response
-
-	//This goroutine processes the packets received by the server (our client)
-	//Function will be moved to another file
-	// go func(pktCh chan comms.Packet) {
-	// 	for pkt := range pktCh {
-	// 		// msg := message.PacketPayloadToMessage(pkt.Payload)
-
-	// 		// switch msg {
-	// 		// case message.KeepAlive:
-	// 		// case message.Choke:
-	// 		// case message.Unchoke:
-	// 		// case message.Interested:
-	// 		// case message.NotInterested:
-	// 		// case message.Have:
-	// 		// case message.Bitfield:
-	// 		// case message.Request:
-	// 		// case message.Piece:
-	// 		// case message.Cancel:
-	// 		// case message.Port:
-	// 		// //Invalid message
-	// 		// default:
-
-	// 		// }
-
-	// 	}
-	// }(s.PktCh)
 }
 
 func OptimisticUnchoking(localState *state.State) {
@@ -170,10 +158,10 @@ func CalculateUploadRate(localState *state.State) {
 	for _, peer := range localState.Peers {
 		time_elapsed := time.Now().UnixNano() - peer.Last_time_updated
 		peer.Last_time_updated = time.Now().UnixNano()
-		if(time_elapsed == 0) {
-			fmt.Println("Time elapsed is 0");
+		if time_elapsed == 0 {
+			fmt.Println("Time elapsed is 0")
 			peer.Uploaded_bytes = 0
-			continue;
+			continue
 		}
 		upload_speed := float64(peer.Uploaded_bytes) / float64(time_elapsed)
 		peer.Upload_speed = upload_speed
