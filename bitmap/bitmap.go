@@ -8,8 +8,10 @@ type Bitmap struct {
 	// Fields:
 	//
 	//   bitmap : stores a boolean value for each piece. true = downloaded, false = not downloaded
+	//   Length : length of the bitmap
 
 	bitmap []bool
+	Length int
 }
 
 func (b Bitmap) String() string {
@@ -66,6 +68,7 @@ func (b *Bitmap) New(length int) {
 	}
 
 	b.bitmap = make([]bool, length)
+	b.Length = length
 }
 
 func (b *Bitmap) HasPiece(index int) bool {

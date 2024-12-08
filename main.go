@@ -53,7 +53,7 @@ func main() {
 	// Initialize the bitmap
 	numberOfpieces := int(math.Ceil(float64(len(torrent_file.Info["pieces"].(string))) / float64(20)))
 
-	localState.Bitmap.New(numberOfpieces) // TODO placeholder length of 50 pieces
+	localState.Bitmap.New(numberOfpieces)
 
 	// Generate an ID
 	localState.GenerateID()

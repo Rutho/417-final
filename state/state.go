@@ -78,7 +78,11 @@ func (s State) String() string {
 	}
 	output += "]\n"
 
-	output += " |  Bitmap      : " + fmt.Sprintf(s.Bitmap.String())
+	if s.Bitmap.Length() > 100 {
+		output += " |  Bitmap      : <omitted due to length>"
+	} else {
+		output += " |  Bitmap      : " + fmt.Sprintf(s.Bitmap.String())
+	}
 
 	return output
 }
@@ -148,10 +152,144 @@ func (s *State) GenerateID() string {
 }
 
 func (s *State) FindPeer(peerId string) *peer.Peer {
+	// Description:
+	//
+	//   method on the State struct to find a peer by ID
+	//
+	// Parameters:
+	//
+	//   a string of length 20 chars, representing the ID
+	//
+	// Returns:
+	//
+	//   a pointer to the peer with the specified ID, or nil if not found
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   peer := localState.FindPeer(msg.PeerId)
+	//   fmt.Println(peer)
+
 	for _, peer := range s.Peers {
 		if peer.Peer_id == peerId {
 			return &peer
 		}
 	}
 	return nil
+}
+
+func (s *State) PeerInterested() []peer.Peer {
+	// Description:
+	//
+	//   method on the State struct to get all the interested peers
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   a slice of peers who are interested in the local client
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   for _, peer := localState.PeerInterested() {
+	//       process(peer)
+	//   }
+
+	var output []peer.Peer
+	for _, peer := range s.Peers {
+		if peer.Peer_interested == true {
+			output = append(output, peer)
+		}
+	}
+	return output
+}
+
+func (s *State) PeerChoking() []peer.Peer {
+	// Description:
+	//
+	//   method on the State struct to get all the peers who are choking us
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   a slice of peers who are choking the local client
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   for _, peer := localState.PeerChoking() {
+	//       process(peer)
+	//   }
+
+	var output []peer.Peer
+	for _, peer := range s.Peers {
+		if peer.Peer_choking == true {
+			output = append(output, peer)
+		}
+	}
+	return output
+}
+
+func (s *State) AmInterested() []peer.Peer {
+	// Description:
+	//
+	//   method on the State struct to get all the peers who we are interested in
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   a slice of peers who the local client is interested in
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   for _, peer := localState.AmInterested() {
+	//       process(peer)
+	//   }
+
+	var output []peer.Peer
+	for _, peer := range s.Peers {
+		if peer.Am_interested == true {
+			output = append(output, peer)
+		}
+	}
+	return output
+}
+
+func (s *State) AmChoking() []peer.Peer {
+	// Description:
+	//
+	//   method on the State struct to get all the peers who we are choking
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   a slice of peers who the local client is choking
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   for _, peer := localState.AmChoking() {
+	//       process(peer)
+	//   }
+
+	var output []peer.Peer
+	for _, peer := range s.Peers {
+		if peer.Am_interested == true {
+			output = append(output, peer)
+		}
+	}
+	return output
 }
