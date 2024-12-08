@@ -1,162 +1,157 @@
 package state
 
-
-
 import (
-    "fmt"         // https://pkg.go.dev/fmt
-    "flag"        // https://pkg.go.dev/flag
-    "client/bitmap"
-    "client/peer"
-    "math/rand"
-    "net"
+	"client/bitmap"
+	"client/peer"
+	"flag" // https://pkg.go.dev/flag
+	"fmt"  // https://pkg.go.dev/fmt
+	"math/rand"
+	"net"
 )
 
-
-
 type State struct {
-    // Description:
-    //
-    //   structure that stores local state information
-    //
-    // Fields:
-    //
-    //   TorrentFile  : name of torrent file in the current directory
-    //   IP      : IP address of the local machine
-    //   Port    : port that this client will run on
-    //   ID      : unique 20-byte string identifier for use in tracker requests and peer handshakes.
-    //   Peers   : all the peers known to the local client (excluding self)
-    //   Top4    : pointers to the top4 peers
-    //   bitmap  : represents which pieces of the file being downloaded have been received
+	// Description:
+	//
+	//   structure that stores local state information
+	//
+	// Fields:
+	//
+	//   TorrentFile  : name of torrent file in the current directory
+	//   IP      : IP address of the local machine
+	//   Port    : port that this client will run on
+	//   ID      : unique 20-byte string identifier for use in tracker requests and peer handshakes.
+	//   Peers   : all the peers known to the local client (excluding self)
+	//   Top4    : pointers to the top4 peers
+	//   bitmap  : represents which pieces of the file being downloaded have been received
 
-    TorrentFile   string
-    IP            net.IP
-    Port          int
-    ID            string
-    Peers         []peer.Peer
-    Top4          []*peer.Peer
-    Bitmap        bitmap.Bitmap
+	TorrentFile string
+	IP          net.IP
+	Port        int
+	ID          string
+	Peers       []peer.Peer
+	Top4        []*peer.Peer
+	Bitmap      bitmap.Bitmap
 }
-
-
 
 func (s State) String() string {
-    // Description:
-    //
-    //   method on the State struct that provides a human-readable string representation
-    //
-    // Parameters:
-    //
-    //   none
-    //
-    // Returns:
-    //
-    //   A string containing the formatted State information
-    //
-    // Example usage:
-    //
-    //   var localState State
-    //   localState.ParseClargs()
-    //   fmt.Println(localState)
+	// Description:
+	//
+	//   method on the State struct that provides a human-readable string representation
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   A string containing the formatted State information
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   localState.ParseClargs()
+	//   fmt.Println(localState)
 
-    var output string = "State:\n"
-    output += fmt.Sprintf(" |  TorrentFile : %s\n", s.TorrentFile)
-    output += fmt.Sprintf(" |  IP          : %s\n", s.IP.String())
-    output += fmt.Sprintf(" |  Port        : %d\n", s.Port)
-    output += fmt.Sprintf(" |  ID          : %s\n", s.ID)
+	var output string = "State:\n"
+	output += fmt.Sprintf(" |  TorrentFile : %s\n", s.TorrentFile)
+	output += fmt.Sprintf(" |  IP          : %s\n", s.IP.String())
+	output += fmt.Sprintf(" |  Port        : %d\n", s.Port)
+	output += fmt.Sprintf(" |  ID          : %s\n", s.ID)
 
-    output += " |  Peers       : ["
-    for i, peer := range s.Peers {
-        if (i == 0) {
-            output += fmt.Sprintf("%s", peer)
-        } else {
-            output += fmt.Sprintf(",\n |                 %s", peer)
-        }
-    }
-    output += "]\n"
+	output += " |  Peers       : ["
+	for i, peer := range s.Peers {
+		if i == 0 {
+			output += fmt.Sprintf("%s", peer)
+		} else {
+			output += fmt.Sprintf(",\n |                 %s", peer)
+		}
+	}
+	output += "]\n"
 
-    output += " |  Top4        : ["
-    for i, peer := range s.Top4 {
-        if (i == 0) {
-            output += fmt.Sprintf("%s", peer)
-        } else {
-            output += fmt.Sprintf(",\n |                 %s", peer)
-        }
-    }
-    output += "]\n"
+	output += " |  Top4        : ["
+	for i, peer := range s.Top4 {
+		if i == 0 {
+			output += fmt.Sprintf("%s", peer)
+		} else {
+			output += fmt.Sprintf(",\n |                 %s", peer)
+		}
+	}
+	output += "]\n"
 
-    output += " |  Bitmap      : " + fmt.Sprintf(s.Bitmap.String())
+	output += " |  Bitmap      : " + fmt.Sprintf(s.Bitmap.String())
 
-    return output
+	return output
 }
-
-
 
 func (s *State) ParseClargs() {
-    // Description:
-    //
-    //   method on the State struct to parse command-line arguments
-    //
-    // Parameters:
-    //
-    //   none
-    //
-    // Returns:
-    //
-    //   nothing
-    //
-    // Example usage:
-    //
-    //   var localState State
-    //   localState.ParseClargs()
-    //   fmt.Println(localState)
+	// Description:
+	//
+	//   method on the State struct to parse command-line arguments
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   nothing
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   localState.ParseClargs()
+	//   fmt.Println(localState)
 
-    // Define -t <torrent file>
-    // Default value "debian-12.8.0-amd64-DVD-1.iso.torrent"
-    s.TorrentFile = *flag.String("t", "debian-12.8.0-amd64-DVD-1.iso.torrent", "filepath/name of torrent file")
+	// Define -t <torrent file>
+	// Default value "debian-12.8.0-amd64-DVD-1.iso.torrent"
+	s.TorrentFile = *flag.String("t", "debian-12.8.0-amd64-DVD-1.iso.torrent", "filepath/name of torrent file")
 
-    // Define -p <port number>
-    // Default value 8080 (BitTorrent typically uses 6881-6889, and 6969 for tracker)
-    s.Port = *flag.Int("p", 8080, "port of host")
+	// Define -p <port number>
+	// Default value 8080 (BitTorrent typically uses 6881-6889, and 6969 for tracker)
+	s.Port = *flag.Int("p", 8080, "port of host")
 
-    // Parse the command line into the defined flags
-    flag.Parse()
+	// Parse the command line into the defined flags
+	flag.Parse()
 }
-
-
 
 func (s *State) GenerateID() string {
-    // Description:
-    //
-    //   method on the State struct to generate a unique 20-byte ID
-    //
-    // Parameters:
-    //
-    //   none
-    //
-    // Returns:
-    //
-    //   a string of length 20 chars, representing the ID
-    //
-    // Example usage:
-    //
-    //   var localState State
-    //   localState.GenerateID()
-    //   fmt.Println(localState)
+	// Description:
+	//
+	//   method on the State struct to generate a unique 20-byte ID
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   a string of length 20 chars, representing the ID
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   localState.GenerateID()
+	//   fmt.Println(localState)
 
-    // RFRA : name of our BitTorrent client
-    // 00   : version number of our BitTorrent client
-    s.ID = "-RFRA00-"
+	// RFRA : name of our BitTorrent client
+	// 00   : version number of our BitTorrent client
+	s.ID = "-RFRA00-"
 
-    // Random
-    chars := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	// Random
+	chars := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
-    for i := len(s.ID); i < 20; i++ {
-        s.ID = s.ID + string(chars[rand.Intn(len(chars))])
-    }
+	for i := len(s.ID); i < 20; i++ {
+		s.ID = s.ID + string(chars[rand.Intn(len(chars))])
+	}
 
-    return s.ID
+	return s.ID
 }
 
-
-
-
+func (s *State) FindPeer(peerId string) *peer.Peer {
+	for _, peer := range s.Peers {
+		if peer.Peer_id == peerId {
+			return &peer
+		}
+	}
+	return nil
+}

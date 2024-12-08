@@ -7,7 +7,9 @@ import (
 	"client/data"
 	"client/peer"
 	"client/state"
+	"encoding/binary"
 	"fmt"
+	"math"
 	"math/rand"
 	"net"
 	"sort"
@@ -49,7 +51,9 @@ func main() {
 	localState.IP = net.ParseIP("127.0.0.1")
 
 	// Initialize the bitmap
-	localState.Bitmap.New(50) // TODO placeholder length of 50 pieces
+	numberOfpieces := int(math.Ceil(float64(len(torrent_file.Info["pieces"].(string))) / float64(20)))
+
+	localState.Bitmap.New(numberOfpieces) // TODO placeholder length of 50 pieces
 
 	// Generate an ID
 	localState.GenerateID()
@@ -60,25 +64,55 @@ func main() {
 	s := comms.NewServer(localState.Port, 2048, string(request_info.Peer_id), request_info.Info_hash)
 	go s.Start()
 
-	establishCh := make(chan peer.Peer, 50)
+	establishCh := make(chan peer.Peer, 60)
+	//Message Processing
+	go func(msgCh chan comms.Message) {
+		for {
+			select {
+			case msg := <-msgCh:
+				peer := localState.FindPeer(msg.PeerId)
+				fmt.Printf("msg type: %d\n", msg.MsgType)
+				switch msg.MsgType {
+				case comms.Bitfield:
+				case comms.Choke:
+					peer.Peer_choking = true
+				case comms.Unchoke:
+					peer.Peer_choking = false
+				case comms.Interested:
+					peer.Peer_interested = true
+				case comms.NotInterested:
+					peer.Peer_interested = false
+				case comms.Piece:
+					//Piece is a little complicated since we have to
+					//consider the possibility of cancels
+				case comms.Cancel:
+				case comms.Port:
+				case comms.KeepAlive:
+				case comms.Request:
+				case comms.Have:
+					piece_index := binary.BigEndian.Uint32(msg.Payload)
+					//casting may be problematic if # of pieces exceed INT_MAX
+					peer.Bitmap.MarkPiece(int(piece_index))
+				}
+			case connectedPeer := <-establishCh:
+				localState.Peers = append(localState.Peers, connectedPeer) //deep copy
+			}
+		}
+	}(s.MsgCh)
+
+	//Actively establish connections to peers
+
 	for _, p := range *response_info.Peers {
 		go func(peer peer.Peer) {
 			conn := comms.NewConnectionState(peer.Ip, peer.Port, peer.Peer_id, string(request_info.Peer_id),
 				request_info.Info_hash, nil)
 			err := s.EstablishConnection(conn)
 			if err == nil {
+				peer.Bitmap.New(numberOfpieces)
 				establishCh <- peer
 			}
 		}(p)
-		// deep copy
 	}
-
-	go func() {
-		for {
-			connectedPeer := <-establishCh
-			localState.Peers = append(localState.Peers, connectedPeer)
-		}
-	}()
 
 	time.Sleep(10000000000)
 	// --------

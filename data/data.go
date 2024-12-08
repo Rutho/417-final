@@ -3,6 +3,7 @@ package data
 import (
 	"bytes"
 	"client/bencode"
+	"client/peer"
 	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
@@ -15,7 +16,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"client/peer"
 )
 
 type UDP_OR_HTTP int
@@ -235,7 +235,6 @@ func Set_tracker_request(request *Tracker_request, info *Torrent_info) {
 	request.Event = "started"
 
 	println("total file size", file_size)
-
 }
 
 func Send_http(request *Tracker_request, ip string, g_port int, response *Tracker_response) int {
@@ -342,9 +341,9 @@ func Send_http(request *Tracker_request, ip string, g_port int, response *Tracke
 			// ----
 			// Connections start out as "choked" and "not interested"
 			// ----
-			tmp_peer.Am_choking      = true
-			tmp_peer.Am_interested   = false
-			tmp_peer.Peer_choking    = true
+			tmp_peer.Am_choking = true
+			tmp_peer.Am_interested = false
+			tmp_peer.Peer_choking = true
 			tmp_peer.Peer_interested = false
 
 			*response.Peers = append(*response.Peers, tmp_peer)

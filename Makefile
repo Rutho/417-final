@@ -13,7 +13,7 @@ all: build
 build:
 	mkdir -p $(BUILD_DIR)
 	cd $(BUILD_DIR)
-	go build -o $(APP_NAME) $(MAIN_FILE)
+	go build -race -o $(APP_NAME) $(MAIN_FILE)
 
 # Run the application
 .PHONY: run

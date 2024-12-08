@@ -16,7 +16,7 @@ type Server struct {
 	localPort    int
 	ln           net.Listener
 	quitCh       chan struct{}
-	PktCh        chan Packet
+	MsgCh        chan Message
 	maxPktSize   uint32
 	serverId     string
 	infoHash     []byte
@@ -42,9 +42,9 @@ type Message struct {
 	PeerAddress net.IP
 	PeerPort    int
 	PeerId      string
-	msgLength   uint32
-	msgType     MsgType
-	payload     []byte
+	MsgLength   uint32
+	MsgType     MsgType
+	Payload     []byte
 }
 
 type MsgType byte
@@ -74,7 +74,7 @@ func NewServer(localPort int, maxPktSize uint32, serverId string, infoHash []byt
 		localAddress: net.ParseIP("127.0.0.1"),
 		localPort:    localPort,
 		quitCh:       make(chan struct{}),
-		PktCh:        make(chan Packet, 10),
+		MsgCh:        make(chan Message, 100),
 		maxPktSize:   maxPktSize,
 		serverId:     serverId,
 		infoHash:     infoHash,
@@ -86,9 +86,9 @@ func NewMessage(peerAddress net.IP, peerPort int, peerId string, msgLength uint3
 		PeerAddress: peerAddress,
 		PeerPort:    peerPort,
 		PeerId:      peerId,
-		msgLength:   msgLength,
-		msgType:     msgType,
-		payload:     payload,
+		MsgLength:   msgLength,
+		MsgType:     msgType,
+		Payload:     payload,
 	}
 }
 
@@ -117,7 +117,7 @@ func (s *Server) Start() {
 	go s.acceptLoop()
 
 	<-s.quitCh
-	close(s.PktCh)
+	close(s.MsgCh)
 
 	return
 }
@@ -175,12 +175,12 @@ func (s *Server) readLoop(conn *ConnectionState) error {
 			return err
 		}
 
-		s.PktCh <- Packet{
+		s.MsgCh <- *(Packet{
 			FromAddress: conn.PeerAddress,
 			FromPort:    conn.PeerPort,
 			FromId:      conn.PeerId,
 			Payload:     buf[:n],
-		}
+		}.PacketPayloadToMessage())
 	}
 }
 
@@ -189,7 +189,6 @@ func (s *Server) readLoop(conn *ConnectionState) error {
 func (p Packet) PacketPayloadToMessage() *Message {
 	payload := p.Payload
 	msgLength := binary.BigEndian.Uint32(payload[:4])
-	fmt.Printf("message length: %d\n", msgLength)
 	var msgType MsgType
 	var msgPayload []byte
 	//Message with no type byte (keep-alive message)
@@ -209,9 +208,9 @@ func (p Packet) PacketPayloadToMessage() *Message {
 		PeerAddress: p.FromAddress,
 		PeerPort:    p.FromPort,
 		PeerId:      p.FromId,
-		msgLength:   msgLength,
-		msgType:     msgType,
-		payload:     msgPayload,
+		MsgLength:   msgLength,
+		MsgType:     msgType,
+		Payload:     msgPayload,
 	}
 }
 
