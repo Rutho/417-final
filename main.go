@@ -88,18 +88,35 @@ func main() {
 	//Peer-specific Message Processing
 	go func(msgCh chan comms.Message) {
 		for msg := range msgCh {
+			fmt.Printf("cool type: %d\n", msg.MsgType)
 			go func(msg comms.Message) {
 				peer := localState.FindPeer(msg.PeerId)
+				fmt.Printf("abc")
 				switch msg.MsgType {
 				case comms.Bitfield:
-					//Bitfield given is not expected.
-					if numberOfpieces != int(msg.MsgLength-1) {
+					//Bitfield size can differ a little from numberOfPieces since
+					//numberOfPieces may not be a multiple of 8, so last byte in Bitfield may have spare bits
+					bitfieldSizeInBits := int(math.Ceil((float64(numberOfpieces) / float64(8)))) * 8
+					if bitfieldSizeInBits != (int(msg.MsgLength-1) * 8) {
 						//TODO: disconnect peer.
 						return
 					}
+					fmt.Println("cool")
 					peer.Bitmap_lock.Lock()
 					//TODO: Parse bitmap message and update peer's bitmap
+					for i, b := range msg.Payload {
+						for kth := 0; kth < 8; kth++ {
+							if (i*8)+kth >= numberOfpieces {
+								break
+							}
+							//AND Masking kth_bit
+							if (b & (1 << (8 - (kth + 1)))) != 0 {
+								peer.Bitmap.MarkPiece((i * 8) + kth)
+							}
+						}
+					}
 					peer.Bitmap_lock.Unlock()
+					fmt.Println(peer.Bitmap)
 				case comms.Choke:
 					peer.UpdatePeerChoking(true)
 				case comms.Unchoke:
@@ -109,12 +126,15 @@ func main() {
 				case comms.NotInterested:
 					peer.UpdatePeerInterested(false)
 				case comms.Port:
+					peer.Port = int(binary.BigEndian.Uint16(msg.Payload))
 				case comms.KeepAlive:
 				case comms.Request:
 				case comms.Have:
 					piece_index := binary.BigEndian.Uint32(msg.Payload)
 					//casting may be problematic if # of pieces exceed INT_MAX
+					peer.Bitmap_lock.Lock()
 					peer.Bitmap.MarkPiece(int(piece_index))
+					peer.Bitmap_lock.Unlock()
 				}
 			}(msg)
 		}
@@ -156,8 +176,9 @@ func main() {
 		}(p)
 	}
 
-	time.Sleep(10000000000)
+	time.Sleep(20000000000)
 
+	fmt.Println(localState)
 	fmt.Println(torrent_file.Announce)
 
 	fmt.Println("Hello!!!")
