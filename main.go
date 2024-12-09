@@ -7,12 +7,12 @@ import (
 	"client/data"
 	"client/peer"
 	"client/state"
+	"client/logic"
 	"encoding/binary"
 	"fmt"
 	"math"
 	"math/rand"
 	"net"
-	"sort"
 	"time"
 )
 
@@ -115,14 +115,7 @@ func main() {
 	}
 
 	time.Sleep(10000000000)
-	// --------
-	// Pick 4 random peers to be the Top4
-	random := rand.Perm(len(localState.Peers))
-	for i := 0; i < len(localState.Peers) && i < 4; i++ {
-		localState.Top4 = append(localState.Top4, &localState.Peers[random[i]])
-	}
 
-	// Print the State struct
 	fmt.Println(localState)
 
 	fmt.Println(torrent_file.Announce)
@@ -135,69 +128,10 @@ func main() {
 		Will need to add feature to have this run continously
 	*/
 	time.AfterFunc(30*time.Second, func() {
-		fmt.Println("OptimisticUnchoking()")
-		OptimisticUnchoking(&localState)
+		logic.ChokeAlgorithm(&localState)
 	})
 
 	time.AfterFunc(10*time.Second, func() {
-		fmt.Println("CalculateUploadRate()")
-		CalculateUploadRate(&localState)
+		logic.CalculateUploadRate(&localState)
 	})
-}
-
-func OptimisticUnchoking(localState *state.State) {
-	if len(localState.Top4) == 4 && len(localState.Peers) > 4 {
-		// Update the top 4 peers. Latest unchoked peer may be a replacement
-		localState.SortPeersByUploadSpeed()
-
-		// Top4 stores pointers to Peer
-		localState.Top4[0] = &localState.Peers[0]
-		localState.Top4[1] = &localState.Peers[1]
-		localState.Top4[2] = &localState.Peers[2]
-		localState.Top4[3] = &localState.Peers[3]
-
-		// Check for any unchoked peers and choke them. Also generate a list of interested peers
-		var interested_peers []*peer.Peer
-		for _, peer := range localState.Peers {
-			if !contains(localState.Top4, &peer) {
-				if !peer.Am_choking {
-					peer.Am_choking = true
-				}
-				if peer.Am_interested {
-					interested_peers = append(interested_peers, &peer)
-				}
-			}
-		}
-		if len(interested_peers) < 1 {
-			fmt.Println("No interested peers to unchoke")
-			return
-		}
-
-		// Randomly unchoke a interested peer
-		interested_peers[rand.Intn(len(interested_peers))].Am_choking = false
-	}
-}
-
-func contains(top_four []*peer.Peer, p *peer.Peer) bool {
-	for _, v := range top_four {
-		if v.Ip.Equal(p.Ip) && v.Port == p.Port {
-			return true
-		}
-	}
-	return false
-}
-
-func CalculateUploadRate(localState *state.State) {
-	for _, peer := range localState.Peers {
-		time_elapsed := time.Now().UnixNano() - peer.Last_time_updated
-		peer.Last_time_updated = time.Now().UnixNano()
-		if time_elapsed == 0 {
-			fmt.Println("Time elapsed is 0")
-			peer.Uploaded_bytes = 0
-			continue
-		}
-		upload_speed := float64(peer.Uploaded_bytes) / float64(time_elapsed)
-		peer.Upload_speed = upload_speed
-		peer.Uploaded_bytes = 0
-	}
 }

@@ -295,10 +295,10 @@ func (s *State) AmChoking() []peer.Peer {
 	return output
 }
 
-func (s *State) SortPeersByUploadSpeed() {
+func (s *State) Top4() []peer.Peer {
 	// Description:
 	//
-	//   method on the State struct to sort the peer list by upload speed
+	//   method on the State struct to get all the peers who are in Top4
 	//
 	// Parameters:
 	//
@@ -306,40 +306,23 @@ func (s *State) SortPeersByUploadSpeed() {
 	//
 	// Returns:
 	//
-	//   nothing
+	//   a slice of peers who are in Top4
 	//
 	// Example usage:
 	//
 	//   var localState State
-	//   localState.SortPeersByUploadSpeed()
-	//   fmt.Println("The peer with the highest upload speed is %s", localState.Peers[0])
+	//   for _, peer := localState.Top4() {
+	//       process(peer)
+	//   }
 
-	// Descending order (e.g. 4.7, 3.2, 2.9, 1.5)
-	sort.Slice(s.Peers, func(i, j int) bool {
-		return s.Peers[i].Upload_speed > s.Peers[j].Upload_speed
-	})
-}
-
-func (s *State) ResetPeerUploadSpeeds() {
-	// Description:
-	//
-	//   method on the State struct to reset the upload speeds of every peer
-	//
-	// Parameters:
-	//
-	//   none
-	//
-	// Returns:
-	//
-	//   nothing
-	//
-	// Example usage:
-	//
-	//   var localState State
-	//   localState.ResetPeerUploadSpeeds()
-
+	var output []peer.Peer
 	for i := range s.Peers {
-		s.Peers[i].Upload_speed = 0
+		if s.Peers[i].Top4 == true {
+			output = append(output, s.Peers[i])
+		}
 	}
+	return output
 }
+
+
 

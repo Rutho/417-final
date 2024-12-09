@@ -36,6 +36,7 @@ type Peer struct {
 	Last_time_updated int64
 	Upload_speed      float64
 	Bitmap            bitmap.Bitmap
+	InTop4            bool
 }
 
 func (p Peer) String() string {
