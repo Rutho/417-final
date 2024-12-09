@@ -131,7 +131,6 @@ func (s *Server) EstablishConnection(conn *ConnectionState) error {
 	}
 
 	conn.Conn = &c
-	fmt.Printf("cool\n")
 	go func() {
 		conn.TwoWayHandshake("BitTorrent protocol", true)
 		//Check if handshake went well. Else, error stuff happens

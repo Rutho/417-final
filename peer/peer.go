@@ -2,6 +2,7 @@ package peer
 
 import (
 	"client/bitmap"
+	"client/comms"
 	"fmt"
 	"net"
 	"sync"
@@ -42,8 +43,9 @@ type Peer struct {
 	Upload_speed         float64
 	Bitmap_lock          *sync.RWMutex
 	Bitmap               bitmap.Bitmap
-	Top4_lock          *sync.RWMutex
-	Top4               bool
+	Top4_lock            *sync.RWMutex
+	Top4                 bool
+	Connection           *comms.ConnectionState
 }
 
 func (p Peer) String() string {

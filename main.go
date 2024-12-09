@@ -150,6 +150,7 @@ func main() {
 			err := s.EstablishConnection(conn)
 			if err == nil {
 				peer.Bitmap.New(numberOfpieces)
+				peer.Connection = conn
 				establishCh <- peer
 			}
 		}(p)
