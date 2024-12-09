@@ -12,7 +12,6 @@ import (
 	"math"
 	"math/rand"
 	"net"
-	"sort"
 	"time"
 )
 
@@ -65,27 +64,49 @@ func main() {
 	go s.Start()
 
 	establishCh := make(chan peer.Peer, 60)
-	//Message Processing
+
+	peerMsgCh := make(chan comms.Message, 60)
+	stateMsgCh := make(chan comms.Message, 60)
+
+	//Message Filtering
+	//Filters peer-specific messages to peerMsgCh and
+	//messages that require local state to stateMsgCh
 	go func(msgCh chan comms.Message) {
-		for {
-			select {
-			case msg := <-msgCh:
+		for msg := range msgCh {
+			switch msg.MsgType {
+			case comms.Bitfield, comms.Choke, comms.Unchoke,
+				comms.Interested, comms.NotInterested, comms.Have,
+				comms.KeepAlive:
+				peerMsgCh <- msg
+			case comms.Piece, comms.Request, comms.Cancel:
+				stateMsgCh <- msg
+			}
+		}
+	}(s.MsgCh)
+
+	//Peer-specific Message Processing
+	go func(msgCh chan comms.Message) {
+		for msg := range msgCh {
+			go func(msg comms.Message) {
 				peer := localState.FindPeer(msg.PeerId)
-				fmt.Printf("msg type: %d\n", msg.MsgType)
 				switch msg.MsgType {
 				case comms.Bitfield:
+					//Bitfield given is not expected.
+					if numberOfpieces != int(msg.MsgLength-1) {
+						//TODO: disconnect peer.
+						return
+					}
+					peer.Bitmap_lock.Lock()
+					//TODO: Parse bitmap message and update peer's bitmap
+					peer.Bitmap_lock.Unlock()
 				case comms.Choke:
-					peer.Peer_choking = true
+					peer.UpdatePeerChoking(true)
 				case comms.Unchoke:
-					peer.Peer_choking = false
+					peer.UpdatePeerChoking(false)
 				case comms.Interested:
-					peer.Peer_interested = true
+					peer.UpdatePeerInterested(true)
 				case comms.NotInterested:
-					peer.Peer_interested = false
-				case comms.Piece:
-					//Piece is a little complicated since we have to
-					//consider the possibility of cancels
-				case comms.Cancel:
+					peer.UpdatePeerInterested(false)
 				case comms.Port:
 				case comms.KeepAlive:
 				case comms.Request:
@@ -94,12 +115,31 @@ func main() {
 					//casting may be problematic if # of pieces exceed INT_MAX
 					peer.Bitmap.MarkPiece(int(piece_index))
 				}
-			case connectedPeer := <-establishCh:
-				localState.Peers = append(localState.Peers, connectedPeer) //deep copy
-			}
+			}(msg)
 		}
-	}(s.MsgCh)
+	}(peerMsgCh)
 
+	//State-dependent messages
+	go func(msgCh chan comms.Message) {
+		for msg := range stateMsgCh {
+			go func(msg comms.Message) {
+				switch msg.MsgType {
+				case comms.Piece:
+				case comms.Request:
+				case comms.Cancel:
+				}
+			}(msg)
+		}
+	}(stateMsgCh)
+
+	go func() {
+		for {
+			connectedPeer := <-establishCh
+			localState.PeersLock.Lock()
+			localState.Peers = append(localState.Peers, connectedPeer) //deep copy
+			localState.PeersLock.Unlock()
+		}
+	}()
 	//Actively establish connections to peers
 
 	for _, p := range *response_info.Peers {
@@ -117,13 +157,17 @@ func main() {
 	time.Sleep(10000000000)
 	// --------
 	// Pick 4 random peers to be the Top4
+	localState.PeersLock.RLock()
+	localState.Top4Lock.Lock()
 	random := rand.Perm(len(localState.Peers))
 	for i := 0; i < len(localState.Peers) && i < 4; i++ {
 		localState.Top4 = append(localState.Top4, &localState.Peers[random[i]])
 	}
+	localState.Top4Lock.Unlock()
+	localState.PeersLock.RUnlock()
 
 	// Print the State struct
-	fmt.Println(localState)
+	//fmt.Println(localState)
 
 	fmt.Println(torrent_file.Announce)
 
@@ -146,18 +190,23 @@ func main() {
 }
 
 func OptimisticUnchoking(localState *state.State) {
+	localState.Top4Lock.Lock()
+	defer localState.Top4Lock.Unlock()
 	if len(localState.Top4) == 4 && len(localState.Peers) > 4 {
 		// Update the top 4 peers. Latest unchoked peer may be a replacement
 		localState.SortPeersByUploadSpeed()
 
 		// Top4 stores pointers to Peer
+		localState.PeersLock.Lock()
 		localState.Top4[0] = &localState.Peers[0]
 		localState.Top4[1] = &localState.Peers[1]
 		localState.Top4[2] = &localState.Peers[2]
 		localState.Top4[3] = &localState.Peers[3]
+		localState.PeersLock.Unlock()
 
 		// Check for any unchoked peers and choke them. Also generate a list of interested peers
 		var interested_peers []*peer.Peer
+		localState.PeersLock.Lock()
 		for _, peer := range localState.Peers {
 			if !contains(localState.Top4, &peer) {
 				if !peer.Am_choking {
@@ -168,13 +217,14 @@ func OptimisticUnchoking(localState *state.State) {
 				}
 			}
 		}
+		localState.PeersLock.Unlock()
 		if len(interested_peers) < 1 {
 			fmt.Println("No interested peers to unchoke")
 			return
 		}
 
 		// Randomly unchoke a interested peer
-		interested_peers[rand.Intn(len(interested_peers))].Am_choking = false
+		interested_peers[rand.Intn(len(interested_peers))].UpdateChoking(false)
 	}
 }
 
@@ -188,6 +238,8 @@ func contains(top_four []*peer.Peer, p *peer.Peer) bool {
 }
 
 func CalculateUploadRate(localState *state.State) {
+	localState.PeersLock.RLock()
+	defer localState.PeersLock.RUnlock()
 	for _, peer := range localState.Peers {
 		time_elapsed := time.Now().UnixNano() - peer.Last_time_updated
 		peer.Last_time_updated = time.Now().UnixNano()
