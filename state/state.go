@@ -319,3 +319,27 @@ func (s *State) SortPeersByUploadSpeed() {
 		return s.Peers[i].Upload_speed > s.Peers[j].Upload_speed
 	})
 }
+
+func (s *State) ResetPeerUploadSpeeds() {
+	// Description:
+	//
+	//   method on the State struct to reset the upload speeds of every peer
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   nothing
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   localState.ResetPeerUploadSpeeds()
+
+	for i := range s.Peers {
+		s.Peers[i].Upload_speed = 0
+	}
+}
+
