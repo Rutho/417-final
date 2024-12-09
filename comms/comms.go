@@ -131,7 +131,6 @@ func (s *Server) EstablishConnection(conn *ConnectionState) error {
 	}
 
 	conn.Conn = &c
-
 	go func() {
 		conn.TwoWayHandshake("BitTorrent protocol", true)
 		//Check if handshake went well. Else, error stuff happens
@@ -170,7 +169,7 @@ func (s *Server) readLoop(conn *ConnectionState) error {
 	for {
 		n, err := (*conn.Conn).Read(buf)
 		if err != nil {
-			fmt.Println("read error:", err)
+			fmt.Println("readloop: read error:", err)
 			(*conn.Conn).Close()
 			return err
 		}
@@ -214,6 +213,45 @@ func (p Packet) PacketPayloadToMessage() *Message {
 	}
 }
 
+func (conn *ConnectionState) SendChoke() {
+	var chokeMsg Message
+	chokeMsg.MsgLength = 1
+	chokeMsg.MsgType = 0
+	conn.sendMessage(chokeMsg)
+}
+
+func (conn *ConnectionState) SendUnchoke() {
+	var unchokeMsg Message
+	unchokeMsg.MsgLength = 1
+	unchokeMsg.MsgType = 1
+	conn.sendMessage(unchokeMsg)
+}
+
+func (conn *ConnectionState) SendInterested() {
+	var interestedMsg Message
+	interestedMsg.MsgLength = 1
+	interestedMsg.MsgType = 2
+	conn.sendMessage(interestedMsg)
+}
+
+func (conn *ConnectionState) SendNotInterested() {
+	var notInterestedMsg Message
+	notInterestedMsg.MsgLength = 1
+	notInterestedMsg.MsgType = 3
+	conn.sendMessage(notInterestedMsg)
+}
+
+func (conn *ConnectionState) sendMessage(msg Message) {
+	msgBytes := make([]byte, 4+msg.MsgLength)
+	binary.BigEndian.PutUint32(msgBytes, msg.MsgLength)
+	msgBytes[4] = byte(msg.MsgType)
+	msgBytes = append(msgBytes, msg.Payload...)
+	_, err := (*conn.Conn).Write(msgBytes)
+	if err != nil {
+		fmt.Println("sendMessage: fprintf error.")
+	}
+}
+
 // Handles two-way handshake.
 // If initiator is true, we send the first handshake and then wait for a handshake.
 // Otherwise, if we aren't the connection initiator, we wait for a handshake from the other side
@@ -232,7 +270,7 @@ func (conn *ConnectionState) TwoWayHandshake(pstr string, initiator bool) error 
 		pstrlen := make([]byte, 1)
 		_, err := (*conn.Conn).Read(pstrlen)
 		if err != nil {
-			fmt.Println("read error:", err)
+			fmt.Println("receiveHandshake: read error:", err)
 			return err
 		}
 		//-1 since we've the read single pstrlen byte
@@ -241,7 +279,7 @@ func (conn *ConnectionState) TwoWayHandshake(pstr string, initiator bool) error 
 		_, err = (*conn.Conn).Read(buf)
 		//TODO: check if info_hash is the same.
 		if err != nil {
-			fmt.Println("read error:", err)
+			fmt.Println("receiveHandshake: read error:", err)
 			return err
 		}
 		return nil

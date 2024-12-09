@@ -120,8 +120,6 @@ func (b *Bitmap) MarkPiece(index int) {
 	//   if (!localState.Bitmap.HasPiece(38)) {
 	//       fmt.Println("I am missing piece 38")
 	//   }
-	b.bitmap_lock.Lock()
-	defer b.bitmap_lock.Unlock()
 	if index < 0 || index >= len(b.bitmap) {
 		panic("HasPiece(): Index out of range")
 	}

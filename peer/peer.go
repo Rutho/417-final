@@ -2,6 +2,7 @@ package peer
 
 import (
 	"client/bitmap"
+	"client/comms"
 	"fmt"
 	"net"
 	"sync"
@@ -44,6 +45,7 @@ type Peer struct {
 	Bitmap               bitmap.Bitmap
 	Top4_lock            *sync.RWMutex
 	Top4                 bool
+	Connection           *comms.ConnectionState
 }
 
 func (p Peer) String() string {
