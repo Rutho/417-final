@@ -37,9 +37,9 @@ func ChokeAlgorithm(s *state.State) {
 	// Choke all peers except those in Top4
 	for i := range s.Peers {
 		if s.Peers[i].Top4 == true {
-			unchoke(s.Peers[i])
+			unchoke(&s.Peers[i])
 		} else {
-			choke(s.Peers[i])
+			choke(&s.Peers[i])
 		}
 	}
 

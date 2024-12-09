@@ -1,5 +1,7 @@
 package bitmap
 
+import "sync"
+
 type Bitmap struct {
 	// Description:
 	//
@@ -9,9 +11,9 @@ type Bitmap struct {
 	//
 	//   bitmap : stores a boolean value for each piece. true = downloaded, false = not downloaded
 	//   Length : length of the bitmap
-
-	bitmap []bool
-	Length int
+	bitmap_lock *sync.RWMutex
+	bitmap      []bool
+	Length      int
 }
 
 func (b Bitmap) String() string {
@@ -90,7 +92,8 @@ func (b *Bitmap) HasPiece(index int) bool {
 	//   if (!localState.Bitmap.HasPiece(38)) {
 	//       fmt.Println("I am missing piece 38")
 	//   }
-
+	b.bitmap_lock.RLock()
+	defer b.bitmap_lock.RUnlock()
 	if index < 0 || index >= len(b.bitmap) {
 		panic("HasPiece(): Index out of range")
 	}
@@ -117,7 +120,8 @@ func (b *Bitmap) MarkPiece(index int) {
 	//   if (!localState.Bitmap.HasPiece(38)) {
 	//       fmt.Println("I am missing piece 38")
 	//   }
-
+	b.bitmap_lock.Lock()
+	defer b.bitmap_lock.Unlock()
 	if index < 0 || index >= len(b.bitmap) {
 		panic("HasPiece(): Index out of range")
 	}
@@ -144,7 +148,8 @@ func (b *Bitmap) UnmarkPiece(index int) {
 	//   if (!localState.Bitmap.HasPiece(38)) {
 	//       fmt.Println("I am missing piece 38")
 	//   }
-
+	b.bitmap_lock.Lock()
+	defer b.bitmap_lock.Unlock()
 	if index < 0 || index >= len(b.bitmap) {
 		panic("HasPiece(): Index out of range")
 	}
@@ -172,7 +177,8 @@ func (b *Bitmap) MissingPieces(totalPieces int) []int {
 	//   for _, piece := range localState.Bitmap.MissingPieces() {
 	//       fmt.Println(piece)
 	//  }
-
+	b.bitmap_lock.RLock()
+	defer b.bitmap_lock.RUnlock()
 	var missing []int
 	for i := 0; i < len(b.bitmap); i++ {
 		if !b.HasPiece(i) {
@@ -201,7 +207,8 @@ func (b *Bitmap) IsComplete() bool {
 	//   if (localState.Bitmap.IsComplete()) {
 	//       fmt.Println("I have all the pieces")
 	//   }
-
+	b.bitmap_lock.RLock()
+	defer b.bitmap_lock.RUnlock()
 	for i := 0; i < len(b.bitmap); i++ {
 		if !b.HasPiece(i) {
 			return false
@@ -229,6 +236,7 @@ func (b *Bitmap) Get() []bool {
 	//   var localState State
 	//   localState.Bitmap.New(50)
 	//   var bitfield []bool := localState.Bitmap.Get()
-
+	b.bitmap_lock.RLock()
+	defer b.bitmap_lock.RUnlock()
 	return b.bitmap
 }

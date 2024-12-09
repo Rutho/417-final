@@ -65,27 +65,49 @@ func main() {
 	go s.Start()
 
 	establishCh := make(chan peer.Peer, 60)
-	//Message Processing
+
+	peerMsgCh := make(chan comms.Message, 60)
+	stateMsgCh := make(chan comms.Message, 60)
+
+	//Message Filtering
+	//Filters peer-specific messages to peerMsgCh and
+	//messages that require local state to stateMsgCh
 	go func(msgCh chan comms.Message) {
-		for {
-			select {
-			case msg := <-msgCh:
+		for msg := range msgCh {
+			switch msg.MsgType {
+			case comms.Bitfield, comms.Choke, comms.Unchoke,
+				comms.Interested, comms.NotInterested, comms.Have,
+				comms.KeepAlive:
+				peerMsgCh <- msg
+			case comms.Piece, comms.Request, comms.Cancel:
+				stateMsgCh <- msg
+			}
+		}
+	}(s.MsgCh)
+
+	//Peer-specific Message Processing
+	go func(msgCh chan comms.Message) {
+		for msg := range msgCh {
+			go func(msg comms.Message) {
 				peer := localState.FindPeer(msg.PeerId)
-				fmt.Printf("msg type: %d\n", msg.MsgType)
 				switch msg.MsgType {
 				case comms.Bitfield:
+					//Bitfield given is not expected.
+					if numberOfpieces != int(msg.MsgLength-1) {
+						//TODO: disconnect peer.
+						return
+					}
+					peer.Bitmap_lock.Lock()
+					//TODO: Parse bitmap message and update peer's bitmap
+					peer.Bitmap_lock.Unlock()
 				case comms.Choke:
-					peer.Peer_choking = true
+					peer.UpdatePeerChoking(true)
 				case comms.Unchoke:
-					peer.Peer_choking = false
+					peer.UpdatePeerChoking(false)
 				case comms.Interested:
-					peer.Peer_interested = true
+					peer.UpdatePeerInterested(true)
 				case comms.NotInterested:
-					peer.Peer_interested = false
-				case comms.Piece:
-					//Piece is a little complicated since we have to
-					//consider the possibility of cancels
-				case comms.Cancel:
+					peer.UpdatePeerInterested(false)
 				case comms.Port:
 				case comms.KeepAlive:
 				case comms.Request:
@@ -94,12 +116,31 @@ func main() {
 					//casting may be problematic if # of pieces exceed INT_MAX
 					peer.Bitmap.MarkPiece(int(piece_index))
 				}
-			case connectedPeer := <-establishCh:
-				localState.Peers = append(localState.Peers, connectedPeer) //deep copy
-			}
+			}(msg)
 		}
-	}(s.MsgCh)
+	}(peerMsgCh)
 
+	//State-dependent messages
+	go func(msgCh chan comms.Message) {
+		for msg := range stateMsgCh {
+			go func(msg comms.Message) {
+				switch msg.MsgType {
+				case comms.Piece:
+				case comms.Request:
+				case comms.Cancel:
+				}
+			}(msg)
+		}
+	}(stateMsgCh)
+
+	go func() {
+		for {
+			connectedPeer := <-establishCh
+			localState.PeersLock.Lock()
+			localState.Peers = append(localState.Peers, connectedPeer) //deep copy
+			localState.PeersLock.Unlock()
+		}
+	}()
 	//Actively establish connections to peers
 
 	for _, p := range *response_info.Peers {
@@ -116,8 +157,6 @@ func main() {
 
 	time.Sleep(10000000000)
 
-	fmt.Println(localState)
-
 	fmt.Println(torrent_file.Announce)
 
 	fmt.Println("Hello!!!")
@@ -128,10 +167,17 @@ func main() {
 		Will need to add feature to have this run continously
 	*/
 	time.AfterFunc(30*time.Second, func() {
+		localState.PeersLock.Lock()
 		logic.ChokeAlgorithm(&localState)
+		localState.PeersLock.Unlock()
 	})
 
 	time.AfterFunc(10*time.Second, func() {
+		localState.PeersLock.Lock()
 		logic.CalculateUploadRate(&localState)
+		localState.PeersLock.Unlock()
 	})
+
+	fmt.Println("Execution reached the end of main().")
 }
+

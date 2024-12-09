@@ -7,7 +7,7 @@ import (
 	"fmt"  // https://pkg.go.dev/fmt
 	"math/rand"
 	"net"
-	"sort"
+	"sync"
 )
 
 type State struct {
@@ -29,8 +29,9 @@ type State struct {
 	IP          net.IP
 	Port        int
 	ID          string
+	PeersLock   sync.RWMutex
 	Peers       []peer.Peer
-	Top4        []*peer.Peer
+	BitmapLock  sync.RWMutex
 	Bitmap      bitmap.Bitmap
 }
 
@@ -59,6 +60,7 @@ func (s State) String() string {
 	output += fmt.Sprintf(" |  Port        : %d\n", s.Port)
 	output += fmt.Sprintf(" |  ID          : %s\n", s.ID)
 
+	s.PeersLock.RLock()
 	output += " |  Peers       : ["
 	for i, peer := range s.Peers {
 		if i == 0 {
@@ -67,16 +69,19 @@ func (s State) String() string {
 			output += fmt.Sprintf(",\n |                 %s", peer)
 		}
 	}
+	s.PeersLock.RUnlock()
 	output += "]\n"
 
 	output += " |  Top4        : ["
-	for i, peer := range s.Top4 {
+	s.PeersLock.RLock()
+	for i, peer := range s.Top4() {
 		if i == 0 {
 			output += fmt.Sprintf("%s", peer)
 		} else {
 			output += fmt.Sprintf(",\n |                 %s", peer)
 		}
 	}
+	s.PeersLock.RUnlock()
 	output += "]\n"
 
 	if s.Bitmap.Length > 100 {
@@ -84,6 +89,9 @@ func (s State) String() string {
 	} else {
 		output += " |  Bitmap      : " + fmt.Sprintf(s.Bitmap.String())
 	}
+	s.BitmapLock.RLock()
+	output += " |  Bitmap      : " + fmt.Sprintf(s.Bitmap.String())
+	s.BitmapLock.RUnlock()
 
 	return output
 }
@@ -153,6 +161,8 @@ func (s *State) GenerateID() string {
 }
 
 func (s *State) FindPeer(peerId string) *peer.Peer {
+	s.PeersLock.RLock()
+	defer s.PeersLock.RUnlock()
 	// Description:
 	//
 	//   method on the State struct to find a peer by ID
@@ -170,7 +180,8 @@ func (s *State) FindPeer(peerId string) *peer.Peer {
 	//   var localState State
 	//   peer := localState.FindPeer("-RFRA00-WZW3JVR4dIv3")
 	//   fmt.Println(peer)
-
+	s.PeersLock.RLock()
+	defer s.PeersLock.RUnlock()
 	for i := range s.Peers {
 		if s.Peers[i].Peer_id == peerId {
 			return &s.Peers[i]
@@ -198,7 +209,8 @@ func (s *State) PeerInterested() []peer.Peer {
 	//   for _, peer := localState.PeerInterested() {
 	//       process(peer)
 	//   }
-
+	s.PeersLock.RLock()
+	defer s.PeersLock.RUnlock()
 	var output []peer.Peer
 	for i := range s.Peers {
 		if s.Peers[i].Peer_interested == true {
@@ -227,7 +239,8 @@ func (s *State) PeerChoking() []peer.Peer {
 	//   for _, peer := localState.PeerChoking() {
 	//       process(peer)
 	//   }
-
+	s.PeersLock.RLock()
+	defer s.PeersLock.RUnlock()
 	var output []peer.Peer
 	for i := range s.Peers {
 		if s.Peers[i].Peer_choking == true {
@@ -256,7 +269,8 @@ func (s *State) AmInterested() []peer.Peer {
 	//   for _, peer := localState.AmInterested() {
 	//       process(peer)
 	//   }
-
+	s.PeersLock.RLock()
+	defer s.PeersLock.RUnlock()
 	var output []peer.Peer
 	for i := range s.Peers {
 		if s.Peers[i].Am_interested == true {
@@ -285,7 +299,8 @@ func (s *State) AmChoking() []peer.Peer {
 	//   for _, peer := localState.AmChoking() {
 	//       process(peer)
 	//   }
-
+	s.PeersLock.RLock()
+	defer s.PeersLock.RUnlock()
 	var output []peer.Peer
 	for i := range s.Peers {
 		if s.Peers[i].Am_interested == true {
@@ -310,10 +325,10 @@ func (s *State) Top4() []peer.Peer {
 	//
 	// Example usage:
 	//
-	//   var localState State
-	//   for _, peer := localState.Top4() {
-	//       process(peer)
-	//   }
+	//   TODO
+
+	s.PeersLock.RLock()
+	defer s.PeersLock.RUnlock()
 
 	var output []peer.Peer
 	for i := range s.Peers {
@@ -323,6 +338,4 @@ func (s *State) Top4() []peer.Peer {
 	}
 	return output
 }
-
-
 
