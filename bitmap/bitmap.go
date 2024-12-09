@@ -211,29 +211,6 @@ func (b *Bitmap) IsComplete() bool {
 	return true
 }
 
-func (b *Bitmap) Length() int {
-	// Description:
-	//
-	//   method on the Bitmap struct
-	//
-	// Parameters:
-	//
-	//   none
-	//
-	// Returns:
-	//
-	//   the length of the bitmap
-	//
-	// Example usage:
-	//
-	//   var localState State
-	//   localState.Bitmap.New(50)
-	//   fmt.Print("Bitmap length = ")
-	//   fmt.Println(localState.Bitmap.Length())
-
-	return len(b.bitmap)
-}
-
 func (b *Bitmap) Get() []bool {
 	// Description:
 	//

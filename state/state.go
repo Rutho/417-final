@@ -78,7 +78,7 @@ func (s State) String() string {
 	}
 	output += "]\n"
 
-	if s.Bitmap.Length() > 100 {
+	if s.Bitmap.Length > 100 {
 		output += " |  Bitmap      : <omitted due to length>"
 	} else {
 		output += " |  Bitmap      : " + fmt.Sprintf(s.Bitmap.String())
@@ -170,9 +170,9 @@ func (s *State) FindPeer(peerId string) *peer.Peer {
 	//   peer := localState.FindPeer(msg.PeerId)
 	//   fmt.Println(peer)
 
-	for _, peer := range s.Peers {
-		if peer.Peer_id == peerId {
-			return &peer
+	for i := range s.Peers {
+		if s.Peers[i].Peer_id == peerId {
+			return &s.Peers[i]
 		}
 	}
 	return nil
@@ -199,9 +199,9 @@ func (s *State) PeerInterested() []peer.Peer {
 	//   }
 
 	var output []peer.Peer
-	for _, peer := range s.Peers {
-		if peer.Peer_interested == true {
-			output = append(output, peer)
+	for i := range s.Peers {
+		if s.Peers[i].Peer_interested == true {
+			output = append(output, s.Peers[i])
 		}
 	}
 	return output
@@ -228,9 +228,9 @@ func (s *State) PeerChoking() []peer.Peer {
 	//   }
 
 	var output []peer.Peer
-	for _, peer := range s.Peers {
-		if peer.Peer_choking == true {
-			output = append(output, peer)
+	for i := range s.Peers {
+		if s.Peers[i].Peer_choking == true {
+			output = append(output, s.Peers[i])
 		}
 	}
 	return output
@@ -257,9 +257,9 @@ func (s *State) AmInterested() []peer.Peer {
 	//   }
 
 	var output []peer.Peer
-	for _, peer := range s.Peers {
-		if peer.Am_interested == true {
-			output = append(output, peer)
+	for i := range s.Peers {
+		if s.Peers[i].Am_interested == true {
+			output = append(output, s.Peers[i])
 		}
 	}
 	return output
@@ -286,9 +286,9 @@ func (s *State) AmChoking() []peer.Peer {
 	//   }
 
 	var output []peer.Peer
-	for _, peer := range s.Peers {
-		if peer.Am_interested == true {
-			output = append(output, peer)
+	for i := range s.Peers {
+		if s.Peers[i].Am_interested == true {
+			output = append(output, s.Peers[i])
 		}
 	}
 	return output
