@@ -5,9 +5,9 @@ package main
 import (
 	"client/comms"
 	"client/data"
+	"client/logic"
 	"client/peer"
 	"client/state"
-	"client/logic"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -180,4 +180,3 @@ func main() {
 
 	fmt.Println("Execution reached the end of main().")
 }
-
