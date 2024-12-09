@@ -67,7 +67,7 @@ func main() {
 	establishCh := make(chan peer.Peer, 60)
 
 	peerMsgCh := make(chan comms.Message, 60)
-	stateMsgCh := make(chan comms.Message, 60)
+	stateMsgCh := make(chan comms.Message, 100)
 
 	//Message Filtering
 	//Filters peer-specific messages to peerMsgCh and
@@ -88,10 +88,8 @@ func main() {
 	//Peer-specific Message Processing
 	go func(msgCh chan comms.Message) {
 		for msg := range msgCh {
-			fmt.Printf("cool type: %d\n", msg.MsgType)
 			go func(msg comms.Message) {
 				peer := localState.FindPeer(msg.PeerId)
-				fmt.Printf("abc")
 				switch msg.MsgType {
 				case comms.Bitfield:
 					//Bitfield size can differ a little from numberOfPieces since
@@ -101,7 +99,6 @@ func main() {
 						//TODO: disconnect peer.
 						return
 					}
-					fmt.Println("cool")
 					peer.Bitmap_lock.Lock()
 					//TODO: Parse bitmap message and update peer's bitmap
 					for i, b := range msg.Payload {
@@ -116,7 +113,6 @@ func main() {
 						}
 					}
 					peer.Bitmap_lock.Unlock()
-					fmt.Println(peer.Bitmap)
 				case comms.Choke:
 					peer.UpdatePeerChoking(true)
 				case comms.Unchoke:
