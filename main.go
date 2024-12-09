@@ -148,9 +148,8 @@ func main() {
 func OptimisticUnchoking(localState *state.State) {
 	if len(localState.Top4) == 4 && len(localState.Peers) > 4 {
 		// Update the top 4 peers. Latest unchoked peer may be a replacement
-		sort.Slice(localState.Peers, func(i, j int) bool {
-			return (localState.Peers)[i].Upload_speed < (localState.Peers)[j].Upload_speed
-		})
+		localState.SortPeersByUploadSpeed()
+
 		// Top4 stores pointers to Peer
 		localState.Top4[0] = &localState.Peers[0]
 		localState.Top4[1] = &localState.Peers[1]

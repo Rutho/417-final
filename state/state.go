@@ -7,6 +7,7 @@ import (
 	"fmt"  // https://pkg.go.dev/fmt
 	"math/rand"
 	"net"
+	"sort"
 )
 
 type State struct {
@@ -167,7 +168,7 @@ func (s *State) FindPeer(peerId string) *peer.Peer {
 	// Example usage:
 	//
 	//   var localState State
-	//   peer := localState.FindPeer(msg.PeerId)
+	//   peer := localState.FindPeer("-RFRA00-WZW3JVR4dIv3")
 	//   fmt.Println(peer)
 
 	for i := range s.Peers {
@@ -292,4 +293,29 @@ func (s *State) AmChoking() []peer.Peer {
 		}
 	}
 	return output
+}
+
+func (s *State) SortPeersByUploadSpeed() {
+	// Description:
+	//
+	//   method on the State struct to sort the peer list by upload speed
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   nothing
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   localState.SortPeersByUploadSpeed()
+	//   fmt.Println("The peer with the highest upload speed is %s", localState.Peers[0])
+
+	// Descending order (e.g. 4.7, 3.2, 2.9, 1.5)
+	sort.Slice(s.Peers, func(i, j int) bool {
+		return s.Peers[i].Upload_speed > s.Peers[j].Upload_speed
+	})
 }
