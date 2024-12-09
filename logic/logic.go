@@ -5,8 +5,6 @@ import (
 	"client/peer"
 	"math/rand"
 	"sort"
-	"time"
-	"fmt"
 )
 
 func ChokeAlgorithm(s *state.State) {
@@ -43,24 +41,9 @@ func ChokeAlgorithm(s *state.State) {
 		}
 	}
 
-	// Reset the upload speeds of every peer
+	// Reset each peer
 	for i := range s.Peers {
-		s.Peers[i].Upload_speed = 0
-	}
-}
-
-func CalculateUploadRate(s *state.State) {
-	for _, peer := range s.Peers {
-		time_elapsed := time.Now().UnixNano() - peer.Last_time_updated
-		peer.Last_time_updated = time.Now().UnixNano()
-		if time_elapsed == 0 {
-			fmt.Println("Time elapsed is 0")
-			peer.Uploaded_bytes = 0
-			continue
-		}
-		upload_speed := float64(peer.Uploaded_bytes) / float64(time_elapsed)
-		peer.Upload_speed = upload_speed
-		peer.Uploaded_bytes = 0
+		s.Peers[i].Uploaded_bytes = 0
 	}
 }
 
@@ -83,7 +66,7 @@ func choke(p *peer.Peer) {
 
 	if p.Am_choking == false {
 		p.Am_choking = true
-		// Send choke message over the wire
+		p.Connection.SendChoke()
 	}
 }
 
@@ -106,7 +89,7 @@ func unchoke(p *peer.Peer) {
 
 	if p.Am_choking == true {
 		p.Am_choking = false
-		// Send unchoke message over the wire
+		p.Connection.SendUnchoke()
 	}
 }
 

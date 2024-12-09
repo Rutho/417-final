@@ -161,20 +161,10 @@ func main() {
 
 	fmt.Println("Hello!!!")
 
-	/*
-		Call Optimistic Unchoking every 30 seconds.
-		Calculate the upload rate of every peer every 10 seconds
-		Will need to add feature to have this run continously
-	*/
-	time.AfterFunc(30*time.Second, func() {
-		localState.PeersLock.Lock()
-		logic.ChokeAlgorithm(&localState)
-		localState.PeersLock.Unlock()
-	})
-
+	// Every 10 seconds, refresh Top4
 	time.AfterFunc(10*time.Second, func() {
 		localState.PeersLock.Lock()
-		logic.CalculateUploadRate(&localState)
+		logic.ChokeAlgorithm(&localState)
 		localState.PeersLock.Unlock()
 	})
 

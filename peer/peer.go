@@ -21,7 +21,7 @@ type Peer struct {
 	//   Peer_choking      :
 	//   Peer_interested   :
 	//   Peer_id           : 20-byte string unique ID. Optionally the same peer_id that is transmitted in tracker requests
-	//   Uploaded_bytes    : int64
+	//   Uploaded_bytes    : Number of bytes uploaded in the current epoch
 	//   Last_time_updated : int64
 	//   Upload_speed      : float64
 	//   Bitmap            : Bitmap of pieces that peer has
@@ -42,8 +42,8 @@ type Peer struct {
 	Upload_speed         float64
 	Bitmap_lock          *sync.RWMutex
 	Bitmap               bitmap.Bitmap
-	Top4_lock          *sync.RWMutex
-	Top4               bool
+	Top4_lock            *sync.RWMutex
+	Top4                 bool
 }
 
 func (p Peer) String() string {
