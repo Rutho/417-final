@@ -1,9 +1,9 @@
 package bitmap
 
 import (
-	"sync"
 	"fmt"
 	"math"
+	"sync"
 )
 
 type Bitmap struct {
@@ -292,6 +292,24 @@ func (b *Bitmap) Compress() ([]byte, int) {
 		}
 	}
 	return compressedBitfield, int(compressedBytes)
+}
+
+func (b *Bitmap) HasExtraPieces(b2 *Bitmap) (bool, error) {
+	if len(b.bitmap) != len(b2.bitmap) {
+		fmt.Printf("HasExtraPieces error: unequal bitmap sizes")
+		return false, fmt.Errorf("Unequal bitmap sizes")
+	}
+	bitmapSize := len(b2.bitmap)
+	b.bitmap_lock.RLock()
+	b2.bitmap_lock.RLock()
+	defer b.bitmap_lock.RUnlock()
+	defer b2.bitmap_lock.RUnlock()
+	for i := 0; i < bitmapSize; i++ {
+		if b.bitmap[i] == false && b2.bitmap[i] == true {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (b *Bitmap) AllReceived() bool {

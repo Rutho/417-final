@@ -85,6 +85,8 @@ func main() {
 
 	peerMsgCh := make(chan comms.Message, 50)
 	stateMsgCh := make(chan comms.Message, 50)
+	establishCh := make(chan peer.Peer, 30)
+	disconnectCh := make(chan string, 50)
 
 	//Message Filtering
 	//Filters peer-specific messages to peerMsgCh and
@@ -130,6 +132,17 @@ func main() {
 					}
 				}
 				peer.Bitmap_lock.Unlock()
+				extra, err := localState.Bitmap.HasExtraPieces(&peer.Bitmap)
+				if err != nil {
+					disconnectCh <- peer.Peer_id
+				}
+				if extra && !peer.Am_interested {
+					peer.UpdateInterested(true)
+					peer.Connection.SendInterested()
+				} else if !extra && peer.Am_interested {
+					peer.UpdateInterested(false)
+					peer.Connection.SendNotInterested()
+				}
 			case comms.Choke:
 				peer.UpdatePeerChoking(true)
 			case comms.Unchoke:
@@ -151,6 +164,10 @@ func main() {
 				peer.Bitmap_lock.Lock()
 				peer.Bitmap.MarkPiece(int(piece_index))
 				peer.Bitmap_lock.Unlock()
+				if !localState.Bitmap.HasPiece(int(piece_index)) && !peer.Am_interested {
+					peer.UpdateInterested(true)
+					peer.Connection.SendInterested()
+				}
 			}
 		}
 	}(peerMsgCh)
@@ -168,26 +185,32 @@ func main() {
 					//between the time we sent a request message to this peer and we received the piece message from this peer
 					//Latter case only happens if we're sending multiple requests for the same block to different peers
 					//Should we include these messages for the calculation of peer's upload rate then?
-					if localState.Bitmap.HasPiece(int(pieceIdx)) {
-						return
-					}
-
-					buf := msg.Payload[8:]
 					peer := localState.FindPeer(msg.PeerId)
+					if !localState.Bitmap.HasPiece(int(pieceIdx)) {
+						buf := msg.Payload[8:]
+						peer.Uploaded_bytes += int64(len(buf))
 
-					peer.Uploaded_bytes += int64(len(buf))
-
-					f.WritePieceOffset(pieceIdx, int(pieceLength), pieceOffset, buf)
-					if f.IsPieceDownloaded(pieceIdx, int(pieceLength)) {
-						localState.Bitmap.MarkPiece(int(pieceIdx))
-						localState.PeersLock.RLock()
-						for _, p := range localState.Peers {
-							p.Connection.SendHave(pieceIdx)
+						f.WritePieceOffset(pieceIdx, int(pieceLength), pieceOffset, buf)
+						if f.IsPieceDownloaded(pieceIdx, int(pieceLength)) {
+							localState.Bitmap.MarkPiece(int(pieceIdx))
+							localState.PeersLock.RLock()
+							for _, p := range localState.Peers {
+								p.Connection.SendHave(pieceIdx)
+							}
+							localState.PeersLock.RUnlock()
 						}
-						localState.PeersLock.RUnlock()
 					}
-					localState.SetAmInterested()
-					peer.Connection.SendInterested()
+					extra, _ := localState.Bitmap.HasExtraPieces(&peer.Bitmap)
+					if extra {
+						if !peer.Am_interested {
+							peer.UpdateInterested(true)
+							peer.Connection.SendInterested()
+						}
+					} else {
+						peer.UpdateInterested(false)
+						peer.Connection.SendNotInterested()
+					}
+
 				case comms.Request:
 					peer := localState.FindPeer(msg.PeerId)
 					if !localState.Bitmap.HasPiece(pieceIdx) || peer.Am_choking {
@@ -209,9 +232,6 @@ func main() {
 			}(msg)
 		}
 	}(stateMsgCh)
-
-	establishCh := make(chan peer.Peer, 30)
-	disconnectCh := make(chan string, 50)
 
 	go func() {
 		for {
@@ -355,7 +375,8 @@ func OptimisticUnchoking(localState *state.State) {
 		for _, peer := range localState.Peers {
 			if !contains(localState.Top4, &peer) {
 				if !peer.Am_choking {
-					peer.Am_choking = true
+					peer.UpdateChoking(true)
+					peer.Connection.SendChoke()
 				}
 				if peer.Am_interested {
 					interested_peers = append(interested_peers, &peer)
@@ -368,7 +389,9 @@ func OptimisticUnchoking(localState *state.State) {
 		}
 
 		// Randomly unchoke a interested peer
-		interested_peers[weightedRandomChoice(interested_peers)].Am_choking = false
+		optimisticPeer := interested_peers[weightedRandomChoice(interested_peers)]
+		optimisticPeer.UpdateChoking(false)
+		optimisticPeer.Connection.SendUnchoke()
 	}
 }
 
