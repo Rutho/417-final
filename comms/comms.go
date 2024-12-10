@@ -186,25 +186,15 @@ func (s *Server) acceptLoop() {
 // Writes the packet + metadata (based on Packet struct) to the msg channel
 func (s *Server) ReadLoop(conn *ConnectionState) error {
 	c := bufio.NewReader(*conn.Conn)
-	keepAliveTicker := time.NewTicker(120 * time.Second)
-	go func(k &time.Ticker) {
-		<-keepAliveTicker.C
-		fmt.Printf("timed out\n")
-		err := (*conn.Conn).Close()
-		if err == nil {
-			s.DisconnectCh <- conn.PeerId
-		}
-	}(keepAliveTicker)
+	defer (*conn.Conn).Close()
 	for {
 		msgLenBuf := make([]byte, 4)
 		msgLenN, err := c.Read(msgLenBuf)
 		//fmt.Printf("%v\n", msgLenBuf)
 		if msgLenN != 4 || err == io.EOF {
-			keepAliveTicker.Reset(time.Microsecond)
 			fmt.Printf("ip: %s, readloop: read error: %s\n", conn.PeerAddress, err)
 			return err
 		}
-		keepAliveTicker.Reset(120 * time.Second)
 		msgLen := binary.BigEndian.Uint32(msgLenBuf)
 		var buf []byte
 		if msgLen != 0 {
