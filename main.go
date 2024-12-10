@@ -213,8 +213,7 @@ func main() {
 			localState.PeersLock.Lock()
 			localState.Peers = append(localState.Peers, connectedPeer) //deep copy
 			localState.PeersLock.Unlock()
-			buf, n := localState.Bitmap.Compress()
-			connectedPeer.Connection.SendBitfield(buf, n)
+			//buf, n := localState.Bitmap.Compress()
 		}
 	}()
 	//Actively establish connections to peers

@@ -131,10 +131,11 @@ func (s *Server) EstablishConnection(conn *ConnectionState) error {
 	}
 
 	conn.Conn = &c
+
+	conn.TwoWayHandshake("BitTorrent protocol", true)
+	//Check if handshake went well. Else, error stuff happens
+	//If it went well, send connection state to connCh and let another goroutine handle processing that
 	go func() {
-		conn.TwoWayHandshake("BitTorrent protocol", true)
-		//Check if handshake went well. Else, error stuff happens
-		//If it went well, send connection state to connCh and let another goroutine handle processing that
 		s.readLoop(conn)
 	}()
 	return nil
@@ -169,7 +170,7 @@ func (s *Server) readLoop(conn *ConnectionState) error {
 		buf := make([]byte, int32(math.Pow(2, 14)))
 		n, err := (*conn.Conn).Read(buf)
 		if err != nil {
-			fmt.Println("readloop: read error:", err)
+			fmt.Printf("ip: %s, readloop: read error: %s\n", conn.PeerAddress, err)
 			(*conn.Conn).Close()
 			return err
 		}
@@ -321,6 +322,7 @@ func (conn *ConnectionState) TwoWayHandshake(pstr string, initiator bool) error 
 		pstrlen := make([]byte, 1)
 		_, err := (*conn.Conn).Read(pstrlen)
 		if err != nil {
+			fmt.Printf("ip: %s", conn.PeerAddress)
 			fmt.Println("receiveHandshake: read error:", err)
 			return err
 		}
@@ -329,7 +331,10 @@ func (conn *ConnectionState) TwoWayHandshake(pstr string, initiator bool) error 
 		buf := make([]byte, handshakePacketSize)
 		_, err = (*conn.Conn).Read(buf)
 		//TODO: check if info_hash is the same.
+
 		if err != nil {
+			fmt.Printf("ip: %s", conn.PeerAddress)
+			fmt.Printf("%v", buf)
 			fmt.Println("receiveHandshake: read error:", err)
 			return err
 		}
