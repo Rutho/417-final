@@ -388,6 +388,18 @@ func Send_http(request *Tracker_request, ip string, g_port int, response *Tracke
 				tmp_peer.Port = int(p_port)
 
 			}
+
+			tmp_peer.Am_choking = true
+			tmp_peer.Am_interested = false
+			tmp_peer.Peer_choking = true
+			tmp_peer.Peer_interested = false
+
+			tmp_peer.Am_choking_lock = new(sync.RWMutex)
+			tmp_peer.Am_interested_lock = new(sync.RWMutex)
+			tmp_peer.Peer_choking_lock = new(sync.RWMutex)
+			tmp_peer.Peer_interested_lock = new(sync.RWMutex)
+			tmp_peer.Bitmap_lock = new(sync.RWMutex)
+
 			*response.Peers = append(*response.Peers, tmp_peer)
 		}
 
@@ -516,6 +528,17 @@ func Send_udp(request *Tracker_request, ip string, g_port int, response *Tracker
 			var tmp_peer peer.Peer
 			tmp_peer.Ip = ip_addr
 			tmp_peer.Port = int(port)
+			tmp_peer.Am_choking = true
+			tmp_peer.Am_interested = false
+			tmp_peer.Peer_choking = true
+			tmp_peer.Peer_interested = false
+
+			tmp_peer.Am_choking_lock = new(sync.RWMutex)
+			tmp_peer.Am_interested_lock = new(sync.RWMutex)
+			tmp_peer.Peer_choking_lock = new(sync.RWMutex)
+			tmp_peer.Peer_interested_lock = new(sync.RWMutex)
+			tmp_peer.Bitmap_lock = new(sync.RWMutex)
+
 			*response.Peers = append(*response.Peers, tmp_peer)
 		}
 

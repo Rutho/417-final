@@ -194,8 +194,9 @@ func (s *Server) ReadLoop(conn *ConnectionState) error {
 			payloadBuf := make([]byte, msgLen)
 			n, err := io.ReadFull(c, payloadBuf)
 			fmt.Printf("read %d bytes\n", n)
-			if err != nil {
+			if err == io.EOF {
 				fmt.Println("message payload: read error:", err)
+				return err
 			}
 			//fmt.Printf("read %d bytes from %s\n", payloadLen, conn.PeerAddress)
 			buf = append(msgLenBuf, payloadBuf...)
@@ -350,9 +351,7 @@ func (conn *ConnectionState) TwoWayHandshake(pstr string, initiator bool) (strin
 	}
 	receiveHandshake := func() (string, error) {
 		pstrlen := make([]byte, 1)
-		(*conn.Conn).SetReadDeadline(time.Now().Add(4 * time.Second))
 		_, err := (*conn.Conn).Read(pstrlen)
-		(*conn.Conn).SetReadDeadline(*new(time.Time))
 		if err != nil {
 			//fmt.Printf("ip: %s", conn.PeerAddress)
 			fmt.Printf("ip: %s, receiveHandshake: read error: %s\n", conn.PeerAddress, err)
