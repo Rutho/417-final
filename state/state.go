@@ -33,6 +33,7 @@ type State struct {
 	ID          string
 	PeersLock   sync.RWMutex
 	Peers       []peer.Peer
+	Top4        []*peer.Peer
 	BitmapLock  sync.RWMutex
 	Bitmap      bitmap.Bitmap
 	Cycle       int
@@ -63,7 +64,6 @@ func (s State) String() string {
 	output += fmt.Sprintf(" |  Port        : %d\n", s.Port)
 	output += fmt.Sprintf(" |  ID          : %s\n", s.ID)
 
-	s.PeersLock.RLock()
 	output += " |  Peers       : ["
 	for i, peer := range s.Peers {
 		if i == 0 {
@@ -72,24 +72,19 @@ func (s State) String() string {
 			output += fmt.Sprintf(",\n |                 %s", peer)
 		}
 	}
-	s.PeersLock.RUnlock()
 	output += "]\n"
 
 	output += " |  Top4        : ["
-	s.PeersLock.RLock()
-	for i, peer := range s.Top4() {
+	for i, peer := range s.Top4 {
 		if i == 0 {
 			output += fmt.Sprintf("%s", peer)
 		} else {
 			output += fmt.Sprintf(",\n |                 %s", peer)
 		}
 	}
-	s.PeersLock.RUnlock()
 	output += "]\n"
 
-	s.BitmapLock.RLock()
 	output += " |  Bitmap      : " + fmt.Sprintf(s.Bitmap.String())
-	s.BitmapLock.RUnlock()
 
 	return output
 }
@@ -315,33 +310,3 @@ func (s *State) AmChoking() []peer.Peer {
 	}
 	return output
 }
-
-func (s *State) Top4() []peer.Peer {
-	// Description:
-	//
-	//   method on the State struct to get all the peers who are in Top4
-	//
-	// Parameters:
-	//
-	//   none
-	//
-	// Returns:
-	//
-	//   a slice of peers who are in Top4
-	//
-	// Example usage:
-	//
-	//   TODO
-
-	s.PeersLock.RLock()
-	defer s.PeersLock.RUnlock()
-
-	var output []peer.Peer
-	for i := range s.Peers {
-		if s.Peers[i].Top4 == true {
-			output = append(output, s.Peers[i])
-		}
-	}
-	return output
-}
-
