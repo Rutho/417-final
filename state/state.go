@@ -310,3 +310,16 @@ func (s *State) AmChoking() []peer.Peer {
 	}
 	return output
 }
+
+func (s *State) SetAmInterested() {
+	for p_idx := range s.Peers{
+		a := s.Bitmap.Get()
+		b := s.Peers[p_idx].Bitmap.Get()
+
+		for i := range a {
+			if a[i] == false && b[i] == true {
+				s.Peers[p_idx].Am_interested = true
+			}
+		}
+	}
+}

@@ -162,8 +162,14 @@ func main() {
 					f.WritePieceOffset(pieceIdx, int(pieceLength), pieceOffset, buf)
 					if f.IsPieceDownloaded(pieceIdx, int(pieceLength)) {
 						localState.Bitmap.MarkPiece(int(pieceIdx))
+
+						// add to Top 4
+						if len(localState.Top4) < 4 {
+							localState.Top4 = append(localState.Top4, localState.FindPeer(msg.PeerId))
+						}
 						//TODO: Send Have Messages to peers
 					}
+					localState.SetAmInterested()
 				case comms.Request:
 					peer := localState.FindPeer(msg.PeerId)
 					if !localState.Bitmap.HasPiece(pieceIdx) || peer.Am_choking {

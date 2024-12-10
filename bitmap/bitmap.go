@@ -176,7 +176,7 @@ func (b *Bitmap) UnmarkPiece(index int) {
 	b.bitmap[index] = false
 }
 
-func (b *Bitmap) MissingPieces(totalPieces int) []int {
+func (b *Bitmap) MissingPieces() []int {
 	// Description:
 	//
 	//   method on the Bitmap struct that returns which pieces are not yet downloaded
@@ -292,4 +292,13 @@ func (b *Bitmap) Compress() ([]byte, int) {
 		}
 	}
 	return compressedBitfield, int(compressedBytes)
+}
+
+func (b *Bitmap) AllReceived() bool {
+	for _, b := range b.bitmap {
+		if b == false {
+			return false
+		}
+	}
+	return true
 }
