@@ -559,7 +559,6 @@ func Resend_get(request *Tracker_request, info *Torrent_info, response *Tracker_
 
 		} else if info.Tracker_Type == UDP {
 			ret = Send_udp(request, tmp_ip, tmp_port, response)
-
 		}
 	}
 
