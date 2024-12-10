@@ -157,8 +157,11 @@ func main() {
 					if localState.Bitmap.HasPiece(int(pieceIdx)) {
 						return
 					}
-					//TODO: Update Peer's upload rate
+
 					buf := msg.Payload[8:]
+					peer := localState.FindPeer(msg.PeerId)
+					peer.Uploaded_bytes += int64(len(buf))
+
 					f.WritePieceOffset(pieceIdx, int(pieceLength), pieceOffset, buf)
 					if f.IsPieceDownloaded(pieceIdx, int(pieceLength)) {
 						localState.Bitmap.MarkPiece(int(pieceIdx))
@@ -210,6 +213,7 @@ func main() {
 				request_info.Info_hash, nil)
 			err := s.EstablishConnection(conn)
 			if err == nil {
+				peer.New = true
 				peer.Bitmap.New(numberOfpieces)
 				peer.Connection = conn
 				establishCh <- peer
@@ -219,7 +223,7 @@ func main() {
 
 	time.Sleep(20000000000)
 
-	//fmt.Println(localState)
+	fmt.Println(localState)
 	fmt.Println(torrent_file.Announce)
 
 	fmt.Println("Hello!!!")
@@ -229,24 +233,37 @@ func main() {
 		Calculate the upload rate of every peer every 10 seconds
 		Will need to add feature to have this run continously
 	*/
-	time.AfterFunc(30*time.Second, func() {
-		fmt.Println("OptimisticUnchoking()")
-		OptimisticUnchoking(&localState)
-	})
+	// Tickers for periodic tasks
+	optimisticUnchokingTicker := time.NewTicker(30 * time.Second)
+	calculateUploadRateTicker := time.NewTicker(10 * time.Second)
+	for {
+		select {
+		case <-optimisticUnchokingTicker.C:
+			fmt.Println("OptimisticUnchoking()")
+			// Lock and perform optimistic unchoking
+			localState.PeersLock.Lock()
+			OptimisticUnchoking(&localState)
+			localState.PeersLock.Unlock()
 
-	time.AfterFunc(10*time.Second, func() {
-		fmt.Println("CalculateUploadRate()")
-		CalculateUploadRate(&localState)
-	})
+		case <-calculateUploadRateTicker.C:
+			fmt.Println("CalculateUploadRate()")
+			// Lock and calculate upload rates
+			localState.PeersLock.Lock()
+			CalculateUploadRate(&localState)
+			localState.PeersLock.Unlock()
+		}
+	}
+
 }
 
 func OptimisticUnchoking(localState *state.State) {
+	fmt.Println(localState)
 	if len(localState.Top4) == 4 && len(localState.Peers) > 4 {
 		// Update the top 4 peers. Latest unchoked peer may be a replacement
 		sort.Slice(localState.Peers, func(i, j int) bool {
 			return (localState.Peers)[i].Upload_speed < (localState.Peers)[j].Upload_speed
 		})
-		
+
 		// Top4 stores pointers to Peer
 		localState.Top4[0] = &localState.Peers[0]
 		localState.Top4[1] = &localState.Peers[1]
@@ -271,7 +288,7 @@ func OptimisticUnchoking(localState *state.State) {
 		}
 
 		// Randomly unchoke a interested peer
-		interested_peers[rand.Intn(len(interested_peers))].Am_choking = false
+		interested_peers[weightedRandomChoice(interested_peers)].Am_choking = false
 	}
 }
 
@@ -297,4 +314,40 @@ func CalculateUploadRate(localState *state.State) {
 		peer.Upload_speed = upload_speed
 		peer.Uploaded_bytes = 0
 	}
+}
+
+func weightedRandomChoice(interested_peers []*peer.Peer) int {
+	/*
+		Assigns a weight to each interested peer
+		New peers are 3x more likely to be chosen
+	*/
+
+	// Step 1: Assign weights
+	weights := make([]float64, len(interested_peers))
+	totalWeight := 0.0
+	for i, peer := range interested_peers {
+		if peer.New { // New peers are 3x more likely to get unchoked
+			weights[i] = 3.0
+			peer.New = false
+		} else {
+			weights[i] = 1.0
+		}
+		totalWeight += weights[i]
+	}
+
+	// Step 2: Normalize weights
+	for i := range weights {
+		weights[i] /= totalWeight
+	}
+
+	// Step 3: Generate a random choice
+	r := rand.Float64()
+	cumulative := 0.0
+	for i, weight := range weights {
+		cumulative += weight
+		if r < cumulative {
+			return i
+		}
+	}
+	return len(interested_peers) - 1 // Fallback in case of rounding errors
 }

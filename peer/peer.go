@@ -44,9 +44,8 @@ type Peer struct {
 	Bitmap_lock          *sync.RWMutex
 	Bitmap               bitmap.Bitmap
 	Top4_lock            *sync.RWMutex
-	Top4                 bool
-	OptimisticUnchoke    bool
 	Connection           *comms.ConnectionState
+	New 				 bool
 }
 
 func (p Peer) String() string {
@@ -96,10 +95,4 @@ func (p *Peer) UpdatePeerInterested(c bool) {
 	p.Peer_interested_lock.Lock()
 	defer p.Peer_interested_lock.Unlock()
 	p.Peer_interested = c
-}
-
-func (p *Peer) UpdateTop4(c bool) {
-	p.Top4_lock.Lock()
-	defer p.Top4_lock.Unlock()
-	p.Top4 = c
 }
