@@ -304,7 +304,7 @@ func main() {
 			localState.PeersLock.RUnlock()
 		case <-sendTrackerRequestTicker.C:
 			fmt.Println("sendTrackerRequest()")
-			data.Send_get(request_info, torrent_file, response_info)
+			data.Resend_get(request_info, torrent_file, response_info)
 			for _, p := range *response_info.Peers {
 				if localState.FindPeerByAddr(p.Ip, p.Port) != nil {
 					continue

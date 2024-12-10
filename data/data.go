@@ -62,6 +62,8 @@ type Torrent_info struct {
 	Created_by    string
 	Encoding      string
 	Tracker_Type  UDP_OR_HTTP
+	Tracker_ip    net.IP
+	Tracker_port  int
 }
 
 func Event_to_num(event string) int32 {
@@ -518,8 +520,30 @@ func Send_udp(request *Tracker_request, ip string, g_port int, response *Tracker
 		}
 
 	}
+
 	return 1
 
+}
+
+func Resend_get(request *Tracker_request, info *Torrent_info, response *Tracker_response) {
+
+	tmp_ip, tmp_port := info.Tracker_ip.String(), info.Tracker_port
+	var ret int = 0
+	if tmp_port != 0 {
+
+		if info.Tracker_Type == HTTP {
+			ret = Send_http(request, tmp_ip, tmp_port, response)
+
+		} else if info.Tracker_Type == UDP {
+			ret = Send_udp(request, tmp_ip, tmp_port, response)
+
+		}
+	}
+
+	if ret != 1 {
+		Send_get(request, info, response)
+
+	}
 }
 
 func Send_get(request *Tracker_request, info *Torrent_info, response *Tracker_response) {
@@ -555,6 +579,8 @@ func Send_get(request *Tracker_request, info *Torrent_info, response *Tracker_re
 				}
 
 				if ret == 1 {
+					info.Tracker_ip = net.IP(tmp_ip)
+					info.Tracker_port = tmp_port
 					do_break = true
 					break
 				}
