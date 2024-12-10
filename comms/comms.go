@@ -165,8 +165,8 @@ func (s *Server) acceptLoop() {
 // Reads packets received from the given connection
 // Writes the packet + metadata (based on Packet struct) to the msg channel
 func (s *Server) readLoop(conn *ConnectionState) error {
-	buf := make([]byte, int32(math.Pow(2, 14)))
 	for {
+		buf := make([]byte, int32(math.Pow(2, 14)))
 		n, err := (*conn.Conn).Read(buf)
 		if err != nil {
 			fmt.Println("readloop: read error:", err)
@@ -239,6 +239,57 @@ func (conn *ConnectionState) SendNotInterested() {
 	notInterestedMsg.MsgLength = 1
 	notInterestedMsg.MsgType = 3
 	conn.sendMessage(notInterestedMsg)
+}
+
+func (conn *ConnectionState) SendPiece(pieceIdx uint32, start_offset uint32, block []byte, n int) {
+	var pieceMsg Message
+	pieceMsg.MsgLength = 9 + uint32(n)
+	pieceMsg.MsgType = 7
+	pieceMsg.Payload = block
+	conn.sendMessage(pieceMsg)
+}
+
+func (conn *ConnectionState) SendRequest(pieceIdx uint32, start_offset uint32, n int) {
+	var requestMsg Message
+	requestMsg.MsgLength = 13
+	requestMsg.MsgType = 6
+	requestMsg.Payload = make([]byte, 4)
+	binary.BigEndian.PutUint32(requestMsg.Payload, uint32(n))
+	conn.sendMessage(requestMsg)
+}
+
+func (conn *ConnectionState) SendHave(pieceIdx byte) {
+	var haveMsg Message
+	haveMsg.MsgLength = 5
+	haveMsg.MsgType = 4
+	haveMsg.Payload = make([]byte, 1)
+	haveMsg.Payload[0] = pieceIdx
+	conn.sendMessage(haveMsg)
+}
+
+func (conn *ConnectionState) SendBitfield(compressedBitfield []byte, n int) {
+	var bitfieldMsg Message
+	bitfieldMsg.MsgLength = uint32(1 + n)
+	bitfieldMsg.MsgType = 5
+	bitfieldMsg.Payload = compressedBitfield
+	conn.sendMessage(bitfieldMsg)
+}
+
+func (conn *ConnectionState) SendKeepAlive() {
+	msgBytes := []byte{0, 0, 0, 0}
+	_, err := (*conn.Conn).Write(msgBytes)
+	if err != nil {
+		fmt.Println("SendKeepAlive: Write error", err)
+	}
+}
+
+func (conn *ConnectionState) SendCancel(pieceIdx uint32, start_offset uint32, n int) {
+	var cancelMsg Message
+	cancelMsg.MsgLength = 13
+	cancelMsg.MsgType = 8
+	cancelMsg.Payload = make([]byte, 4)
+	binary.BigEndian.PutUint32(cancelMsg.Payload, uint32(n))
+	conn.sendMessage(cancelMsg)
 }
 
 func (conn *ConnectionState) sendMessage(msg Message) {

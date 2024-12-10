@@ -3,6 +3,7 @@ package bitmap
 import (
 	"sync"
 	"fmt"
+	"math"
 )
 
 type Bitmap struct {
@@ -89,6 +90,7 @@ func (b *Bitmap) New(length int) {
 	}
 
 	b.bitmap = make([]bool, length)
+	b.bitmap_lock = new(sync.RWMutex)
 	b.Length = length
 }
 
@@ -256,4 +258,38 @@ func (b *Bitmap) Get() []bool {
 	b.bitmap_lock.RLock()
 	defer b.bitmap_lock.RUnlock()
 	return b.bitmap
+}
+
+// Description:
+//
+//	method on the Bitmap struct that returns a compressed version of the bitmap (each bitmap byte is compressed into a bit)
+//	each piece on the compressed bitmap is represented in one bit (high bit of the first byte represents the first piece/0th piece index).
+//	the bit that represents a piece is set to 1 if we have that piece, 0 if we don't.
+//
+// Parameters:
+//
+//	none
+//
+// Returns:
+//
+//	a compressed representation of the bitmap
+//
+// Example usage:
+//
+//	var localState State
+//	localState.Bitmap.New(50)
+//	var bitfield []bool := localState.Bitmap.Get()
+func (b *Bitmap) Compress() ([]byte, int) {
+	b.bitmap_lock.RLock()
+	defer b.bitmap_lock.RUnlock()
+	compressedBytes := int64(math.Ceil(float64(b.Length) / float64(8)))
+	compressedBitfield := make([]byte, compressedBytes)
+	for i := 0; i < b.Length; i++ {
+		if b.bitmap[i] {
+			placedByte := i / 8
+			bitInByte := i - placedByte
+			compressedBitfield[placedByte] = compressedBitfield[placedByte] | (1 << (8 - (bitInByte + 1)))
+		}
+	}
+	return compressedBitfield, int(compressedBytes)
 }
