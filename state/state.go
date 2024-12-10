@@ -185,6 +185,38 @@ func (s *State) FindPeer(peerId string) *peer.Peer {
 	return nil
 }
 
+func (s *State) FindPeerByAddr(peerAddress net.IP, port int) *peer.Peer {
+	// Description:
+	//
+	//   method on the State struct to find a peer by ID
+	//
+	// Parameters:
+	//
+	//   a net.IP representing the peer's ip address
+	//	 an int representing the peer's port
+	//
+	// Returns:
+	//
+	//   a pointer to the peer with the specified ID, or nil if not found
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   peer := localState.FindPeer("-RFRA00-WZW3JVR4dIv3")
+	//   fmt.Println(peer)
+
+	s.PeersLock.RLock()
+	defer s.PeersLock.RUnlock()
+
+	for i := range s.Peers {
+		if strings.Compare(s.Peers[i].Ip.String(), peerAddress.String()) == 0 &&
+			s.Peers[i].Port == port {
+			return &s.Peers[i]
+		}
+	}
+	return nil
+}
+
 func (s *State) PeerInterested() []peer.Peer {
 	// Description:
 	//

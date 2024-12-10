@@ -183,10 +183,10 @@ func (s *Server) ReadLoop(conn *ConnectionState) error {
 	for {
 		msgLenBuf := make([]byte, 4)
 		msgLenN, err := c.Read(msgLenBuf)
-		fmt.Printf("%v\n", msgLenBuf)
-		if msgLenN != 4 || err != nil {
+		//fmt.Printf("%v\n", msgLenBuf)
+		if msgLenN != 4 || err == io.EOF {
 			fmt.Printf("ip: %s, readloop: read error: %s\n", conn.PeerAddress, err)
-			continue
+			return err
 		}
 		msgLen := binary.BigEndian.Uint32(msgLenBuf)
 		var buf []byte

@@ -53,7 +53,6 @@ func main() {
 	request_info.Key = "wow"
 	torrent_file.Tracker_Type = data.HTTP
 	data.Send_get(request_info, torrent_file, response_info)
-	fmt.Println(response_info.Interval)
 	infoHashStr := torrent_file.Info["pieces"].(string)
 	f := filemanager.Open(torrent_file.Info["name"].(string), []byte(infoHashStr))
 	fmt.Printf("Saving to %s\n", f.Filename)
@@ -274,10 +273,10 @@ func main() {
 	var sendTrackerRequestTicker *time.Ticker
 	if response_info.Min_interval != 0 {
 		sendTrackerRequestTicker = time.NewTicker(time.Duration(response_info.Min_interval) * time.Second)
-	} else if response_info.Interval != 0 {
-		sendTrackerRequestTicker = time.NewTicker(time.Duration(response_info.Interval) * time.Second)
+	} else if len(localState.Peers) < 30 {
+		sendTrackerRequestTicker = time.NewTicker(time.Duration(10) * time.Second)
 	} else {
-		sendTrackerRequestTicker = time.NewTicker(100 * time.Second)
+		sendTrackerRequestTicker = time.NewTicker(time.Duration(int(math.Min(float64(response_info.Interval), 300))) * time.Second)
 	}
 
 	for {
@@ -305,9 +304,33 @@ func main() {
 			localState.PeersLock.RUnlock()
 		case <-sendTrackerRequestTicker.C:
 			fmt.Println("sendTrackerRequest()")
-			go func() {
-				data.Send_get(request_info, torrent_file, response_info)
-			}()
+			data.Send_get(request_info, torrent_file, response_info)
+			for _, p := range *response_info.Peers {
+				if localState.FindPeerByAddr(p.Ip, p.Port) != nil {
+					continue
+				}
+				go func(peer peer.Peer) {
+					conn := comms.NewConnectionState(peer.Ip, peer.Port, peer.Peer_id, string(request_info.Peer_id),
+						request_info.Info_hash, nil)
+					peerId, err := s.EstablishConnection(conn, disconnectCh)
+					if err != nil {
+						return
+					}
+					fmt.Printf("peerID: %s\n", peerId)
+					peer.New = true
+					peer.Bitmap.New(numberOfpieces)
+					peer.Connection = conn
+					peer.Peer_id = peerId
+					establishCh <- peer
+				}(p)
+			}
+			if response_info.Min_interval != 0 && len(localState.Peers) < 30 {
+				sendTrackerRequestTicker.Reset(time.Duration(response_info.Min_interval) * time.Second)
+			} else if len(localState.Peers) < 30 {
+				sendTrackerRequestTicker.Reset(time.Duration(5) * time.Second)
+			} else {
+				sendTrackerRequestTicker.Reset(time.Duration(int(math.Min(float64(response_info.Interval), 300))) * time.Second)
+			}
 		}
 
 	}
