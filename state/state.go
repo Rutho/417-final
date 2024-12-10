@@ -7,6 +7,7 @@ import (
 	"fmt"  // https://pkg.go.dev/fmt
 	"math/rand"
 	"net"
+	"strings"
 	"sync"
 )
 
@@ -312,7 +313,7 @@ func (s *State) AmChoking() []peer.Peer {
 }
 
 func (s *State) SetAmInterested() {
-	for p_idx := range s.Peers{
+	for p_idx := range s.Peers {
 		a := s.Bitmap.Get()
 		b := s.Peers[p_idx].Bitmap.Get()
 
@@ -322,4 +323,23 @@ func (s *State) SetAmInterested() {
 			}
 		}
 	}
+}
+
+func (s *State) RemovePeer(PeerId string) {
+	idx := 0
+	s.PeersLock.Lock()
+	defer s.PeersLock.Unlock()
+	for p_idx := range s.Peers {
+		if strings.Compare(s.Peers[p_idx].Peer_id, PeerId) == 0 {
+			idx = p_idx
+		}
+	}
+	if idx == 0 {
+		return
+	}
+	if idx == (len(s.Peers) - 1) {
+		s.Peers = s.Peers[:len(s.Peers)-1]
+	}
+	s.Peers = append(s.Peers[:idx], s.Peers[idx+1:]...)
+	fmt.Printf("cool\n")
 }

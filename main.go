@@ -65,7 +65,7 @@ func main() {
 	localState.IP = net.ParseIP("127.0.0.1")
 
 	pieceLength := torrent_file.Info["piece length"].(int64)
-	fmt.Printf("piece length: %d\n", pieceLength)
+	//fmt.Printf("piece length: %d\n", pieceLength)
 	// Initialize the bitmap
 	numberOfpieces := int(math.Ceil(float64(len(torrent_file.Info["pieces"].(string))) / float64(20)))
 
@@ -82,8 +82,6 @@ func main() {
 
 	s := comms.NewServer(localState.Port, 2048, string(request_info.Peer_id), request_info.Info_hash)
 	go s.Start()
-
-	establishCh := make(chan peer.Peer, 60)
 
 	peerMsgCh := make(chan comms.Message, 60)
 	stateMsgCh := make(chan comms.Message, 100)
@@ -107,53 +105,53 @@ func main() {
 	//Peer-specific Message Processing
 	go func(msgCh chan comms.Message) {
 		for msg := range msgCh {
-			go func(msg comms.Message) {
-				peer := localState.FindPeer(msg.PeerId)
-				switch msg.MsgType {
-				case comms.Bitfield:
-					//Bitfield size can differ a little from numberOfPieces since
-					//numberOfPieces may not be a multiple of 8, so last byte in Bitfield may have spare bits
-					bitfieldSizeInBits := int(math.Ceil((float64(numberOfpieces) / float64(8)))) * 8
-					if bitfieldSizeInBits != (int(msg.MsgLength-1) * 8) {
-						//TODO: disconnect peer.
-						return
-					}
-					peer.Bitmap_lock.Lock()
-					for i, b := range msg.Payload {
-						for kth := 0; kth < 8; kth++ {
-							if (i*8)+kth >= numberOfpieces {
-								break
-							}
-							//AND Masking kth_bit
-							if (b & (1 << (8 - (kth + 1)))) != 0 {
-								peer.Bitmap.MarkPiece((i * 8) + kth)
-							}
+			//fmt.Printf("peer address: %s\n", msg.PeerAddress)
+			peer := localState.FindPeer(msg.PeerId)
+			switch msg.MsgType {
+			case comms.Bitfield:
+				//Bitfield size can differ a little from numberOfPieces since
+				//numberOfPieces may not be a multiple of 8, so last byte in Bitfield may have spare bits
+				bitfieldSizeInBits := int(math.Ceil((float64(numberOfpieces) / float64(8)))) * 8
+				if bitfieldSizeInBits != (int(msg.MsgLength-1) * 8) {
+					//fmt.Printf("whatt\n")
+					//TODO: disconnect peer.
+					return
+				}
+				peer.Bitmap_lock.Lock()
+				for i, b := range msg.Payload {
+					for kth := 0; kth < 8; kth++ {
+						if (i*8)+kth >= numberOfpieces {
+							break
+						}
+						//AND Masking kth_bit
+						if (b & (1 << (8 - (kth + 1)))) != 0 {
+							peer.Bitmap.MarkPiece((i * 8) + kth)
 						}
 					}
-					peer.Bitmap_lock.Unlock()
-				case comms.Choke:
-					peer.UpdatePeerChoking(true)
-				case comms.Unchoke:
-					peer.UpdatePeerChoking(false)
-					// add to Top 4
-					if len(localState.Top4) < 4 {
-						localState.Top4 = append(localState.Top4, localState.FindPeer(msg.PeerId))
-					}
-				case comms.Interested:
-					peer.UpdatePeerInterested(true)
-				case comms.NotInterested:
-					peer.UpdatePeerInterested(false)
-				case comms.Port:
-					peer.Port = int(binary.BigEndian.Uint16(msg.Payload))
-				case comms.KeepAlive:
-				case comms.Have:
-					piece_index := msg.Payload[0]
-					//casting may be problematic if # of pieces exceed INT_MAX
-					peer.Bitmap_lock.Lock()
-					peer.Bitmap.MarkPiece(int(piece_index))
-					peer.Bitmap_lock.Unlock()
 				}
-			}(msg)
+				peer.Bitmap_lock.Unlock()
+			case comms.Choke:
+				peer.UpdatePeerChoking(true)
+			case comms.Unchoke:
+				peer.UpdatePeerChoking(false)
+				// add to Top 4
+				if len(localState.Top4) < 4 {
+					localState.Top4 = append(localState.Top4, localState.FindPeer(msg.PeerId))
+				}
+			case comms.Interested:
+				peer.UpdatePeerInterested(true)
+			case comms.NotInterested:
+				peer.UpdatePeerInterested(false)
+			case comms.Port:
+				peer.Port = int(binary.BigEndian.Uint16(msg.Payload))
+			case comms.KeepAlive:
+			case comms.Have:
+				piece_index := msg.Payload[0]
+				//casting may be problematic if # of pieces exceed INT_MAX
+				peer.Bitmap_lock.Lock()
+				peer.Bitmap.MarkPiece(int(piece_index))
+				peer.Bitmap_lock.Unlock()
+			}
 		}
 	}(peerMsgCh)
 
@@ -176,14 +174,20 @@ func main() {
 
 					buf := msg.Payload[8:]
 					peer := localState.FindPeer(msg.PeerId)
+
 					peer.Uploaded_bytes += int64(len(buf))
 
 					f.WritePieceOffset(pieceIdx, int(pieceLength), pieceOffset, buf)
 					if f.IsPieceDownloaded(pieceIdx, int(pieceLength)) {
 						localState.Bitmap.MarkPiece(int(pieceIdx))
-						//TODO: Send Have Messages to peers
+						localState.PeersLock.RLock()
+						for _, p := range localState.Peers {
+							p.Connection.SendHave(pieceIdx)
+						}
+						localState.PeersLock.RUnlock()
 					}
 					localState.SetAmInterested()
+					peer.Connection.SendInterested()
 				case comms.Request:
 					peer := localState.FindPeer(msg.PeerId)
 					if !localState.Bitmap.HasPiece(pieceIdx) || peer.Am_choking {
@@ -200,40 +204,58 @@ func main() {
 					} else {
 						fmt.Printf("Abnormal Error: Failed to find peer that requested pieces")
 					}
-
 				case comms.Cancel:
 				}
 			}(msg)
 		}
 	}(stateMsgCh)
 
+	establishCh := make(chan peer.Peer, 60)
+	disconnectCh := make(chan string, 100)
+
 	go func() {
 		for {
-			connectedPeer := <-establishCh
-			localState.PeersLock.Lock()
-			localState.Peers = append(localState.Peers, connectedPeer) //deep copy
-			localState.PeersLock.Unlock()
+			select {
+			case connectedPeer := <-establishCh:
+				localState.PeersLock.Lock()
+				localState.Peers = append(localState.Peers, connectedPeer) //deep copy
+				localState.PeersLock.Unlock()
+				go func() {
+					err := s.ReadLoop(connectedPeer.Connection)
+					if err != nil {
+						disconnectCh <- connectedPeer.Peer_id
+					}
+				}()
+			case disconnectedPeerId := <-disconnectCh:
+				fmt.Printf("disconnected: %s\n", disconnectedPeerId)
+				localState.RemovePeer(disconnectedPeerId)
+			}
+
 			//buf, n := localState.Bitmap.Compress()
 		}
 	}()
+
 	//Actively establish connections to peers
 	for _, p := range *response_info.Peers {
 		go func(peer peer.Peer) {
 			conn := comms.NewConnectionState(peer.Ip, peer.Port, peer.Peer_id, string(request_info.Peer_id),
 				request_info.Info_hash, nil)
-			err := s.EstablishConnection(conn)
-			if err == nil {
-				peer.New = true
-				peer.Bitmap.New(numberOfpieces)
-				peer.Connection = conn
-				establishCh <- peer
+			peerId, err := s.EstablishConnection(conn, disconnectCh)
+			if err != nil {
+				return
 			}
+			fmt.Printf("peerID: %s\n", peerId)
+			peer.New = true
+			peer.Bitmap.New(numberOfpieces)
+			peer.Connection = conn
+			peer.Peer_id = peerId
+			establishCh <- peer
 		}(p)
 	}
 
 	time.Sleep(20000000000)
 
-	fmt.Println(localState)
+	//fmt.Println(localState)
 	fmt.Println(torrent_file.Announce)
 
 	fmt.Println("Hello!!!")
@@ -263,11 +285,10 @@ func main() {
 			localState.PeersLock.Unlock()
 		}
 	}
-
 }
 
 func OptimisticUnchoking(localState *state.State) {
-	fmt.Println(localState)
+	//fmt.Println(localState)
 	if len(localState.Top4) == 4 && len(localState.Peers) > 4 {
 		// Update the top 4 peers. Latest unchoked peer may be a replacement
 		sort.Slice(localState.Peers, func(i, j int) bool {

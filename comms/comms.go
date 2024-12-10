@@ -5,7 +5,6 @@ package comms
 import (
 	"encoding/binary"
 	"fmt"
-	"math"
 	"net"
 	"strconv"
 	"strings"
@@ -123,22 +122,26 @@ func (s *Server) Start() {
 }
 
 // Establishes a TCP connection and initiates BitTorrent handshake (active open)
-func (s *Server) EstablishConnection(conn *ConnectionState) error {
+func (s *Server) EstablishConnection(conn *ConnectionState, disconnectCh chan string) (string, error) {
+	fmt.Println("cool\n")
 	c, err := net.Dial("tcp", fmt.Sprintf("%s:%d", conn.PeerAddress, conn.PeerPort))
 	if err != nil {
 		fmt.Println("EstablishConnection: dial error:", err)
-		return err
+		return "", err
 	}
 
 	conn.Conn = &c
 
-	conn.TwoWayHandshake("BitTorrent protocol", true)
+	peerId, err := conn.TwoWayHandshake("BitTorrent protocol", true)
+	if err != nil {
+		c.Close()
+		return "", err
+	}
 	//Check if handshake went well. Else, error stuff happens
 	//If it went well, send connection state to connCh and let another goroutine handle processing that
-	go func() {
-		s.readLoop(conn)
-	}()
-	return nil
+
+	conn.PeerId = peerId
+	return peerId, nil
 }
 
 func (s *Server) acceptLoop() {
@@ -157,7 +160,15 @@ func (s *Server) acceptLoop() {
 		go func() {
 			conn := NewConnectionState(net.IP(fromAddressString), fromPort, "", s.serverId, s.infoHash, &c)
 			fmt.Printf("established connection with %s\n", c.RemoteAddr())
-			s.readLoop(conn)
+			_, err := conn.TwoWayHandshake("BitTorrent protocol", false)
+			//peer.Peer.
+			//Handle Peers connecting to us
+			if err == nil {
+				go func() {
+					s.ReadLoop(conn)
+				}()
+			}
+
 		}()
 	}
 
@@ -165,21 +176,34 @@ func (s *Server) acceptLoop() {
 
 // Reads packets received from the given connection
 // Writes the packet + metadata (based on Packet struct) to the msg channel
-func (s *Server) readLoop(conn *ConnectionState) error {
+func (s *Server) ReadLoop(conn *ConnectionState) error {
 	for {
-		buf := make([]byte, int32(math.Pow(2, 14)))
-		n, err := (*conn.Conn).Read(buf)
-		if err != nil {
+		msgLenBuf := make([]byte, 4)
+		msgLenN, err := (*conn.Conn).Read(msgLenBuf)
+		if msgLenN != 4 || err != nil {
 			fmt.Printf("ip: %s, readloop: read error: %s\n", conn.PeerAddress, err)
 			(*conn.Conn).Close()
 			return err
+		}
+		msgLen := binary.BigEndian.Uint32(msgLenBuf)
+		var buf []byte
+		if msgLen != 0 {
+			payloadBuf := make([]byte, msgLen)
+			_, err := (*conn.Conn).Read(payloadBuf)
+			if err != nil {
+				fmt.Println("message payload: read error:", err)
+			}
+			//fmt.Printf("read %d bytes from %s\n", payloadLen, conn.PeerAddress)
+			buf = append(msgLenBuf, payloadBuf...)
+		} else {
+			buf = msgLenBuf
 		}
 
 		s.MsgCh <- *(Packet{
 			FromAddress: conn.PeerAddress,
 			FromPort:    conn.PeerPort,
 			FromId:      conn.PeerId,
-			Payload:     buf[:n],
+			Payload:     buf[:],
 		}.PacketPayloadToMessage())
 	}
 }
@@ -192,11 +216,12 @@ func (p Packet) PacketPayloadToMessage() *Message {
 	var msgType MsgType
 	var msgPayload []byte
 	//Message with no type byte (keep-alive message)
-	if len(payload) <= 4 {
+	if msgLength == 0 {
 		msgType = KeepAlive
 		msgPayload = nil
 	} else {
 		msgType = MsgType(payload[4])
+		//fmt.Printf("peer: %s, len: %d, msgType: %d\n", p.FromAddress, msgLength, msgType)
 		//Message with no payload
 		if len(payload) <= 5 {
 			msgPayload = nil
@@ -259,12 +284,12 @@ func (conn *ConnectionState) SendRequest(pieceIdx uint32, start_offset uint32, n
 	conn.sendMessage(requestMsg)
 }
 
-func (conn *ConnectionState) SendHave(pieceIdx byte) {
+func (conn *ConnectionState) SendHave(pieceIdx int) {
 	var haveMsg Message
 	haveMsg.MsgLength = 5
 	haveMsg.MsgType = 4
-	haveMsg.Payload = make([]byte, 1)
-	haveMsg.Payload[0] = pieceIdx
+	haveMsg.Payload = make([]byte, 4)
+	binary.BigEndian.PutUint32(haveMsg.Payload, uint32(pieceIdx))
 	conn.sendMessage(haveMsg)
 }
 
@@ -296,6 +321,7 @@ func (conn *ConnectionState) SendCancel(pieceIdx uint32, start_offset uint32, n 
 func (conn *ConnectionState) sendMessage(msg Message) {
 	msgBytes := make([]byte, 4+msg.MsgLength)
 	binary.BigEndian.PutUint32(msgBytes, msg.MsgLength)
+	//fmt.Printf("sending msg type: %d\n", msg.MsgType)
 	msgBytes[4] = byte(msg.MsgType)
 	msgBytes = append(msgBytes, msg.Payload...)
 	_, err := (*conn.Conn).Write(msgBytes)
@@ -308,7 +334,7 @@ func (conn *ConnectionState) sendMessage(msg Message) {
 // If initiator is true, we send the first handshake and then wait for a handshake.
 // Otherwise, if we aren't the connection initiator, we wait for a handshake from the other side
 // before sending a handshake back.
-func (conn *ConnectionState) TwoWayHandshake(pstr string, initiator bool) error {
+func (conn *ConnectionState) TwoWayHandshake(pstr string, initiator bool) (string, error) {
 	sendHandshake := func() error {
 		_, err := fmt.Fprintf(*conn.Conn, "\x13BitTorrent protocol\x00\x00\x00\x00\x00\x00\x00\x00%s%s",
 			conn.infoHash, conn.clientId)
@@ -318,46 +344,53 @@ func (conn *ConnectionState) TwoWayHandshake(pstr string, initiator bool) error 
 		}
 		return nil
 	}
-	receiveHandshake := func() error {
+	receiveHandshake := func() (string, error) {
 		pstrlen := make([]byte, 1)
 		_, err := (*conn.Conn).Read(pstrlen)
 		if err != nil {
-			fmt.Printf("ip: %s", conn.PeerAddress)
-			fmt.Println("receiveHandshake: read error:", err)
-			return err
+			//fmt.Printf("ip: %s", conn.PeerAddress)
+			fmt.Printf("ip: %s, receiveHandshake: read error: %s\n", conn.PeerAddress, err)
+			return "", err
 		}
 		//-1 since we've the read single pstrlen byte
 		handshakePacketSize := 49 + uint8(pstrlen[0]) - 1
 		buf := make([]byte, handshakePacketSize)
 		_, err = (*conn.Conn).Read(buf)
-		//TODO: check if info_hash is the same.
-
 		if err != nil {
-			fmt.Printf("ip: %s", conn.PeerAddress)
-			fmt.Printf("%v", buf)
-			fmt.Println("receiveHandshake: read error:", err)
-			return err
+			//fmt.Printf("ip: %s", conn.PeerAddress)
+			//fmt.Printf("%v", buf)
+			//fmt.Println("receiveHandshake: read error:", err)
+			return "", err
 		}
-		return nil
+		//fmt.Printf("handshake bytes: %d\n", n)
+		//TODO: check if info_hash is the same.
+		//infoHash := buf[uint8(pstrlen[0])+8 : uint(pstrlen[0])+8+20]
+		//fmt.Printf("%v\n", infoHash)
+		peerId := buf[uint8(pstrlen[0])+8+20 : uint(pstrlen[0])+8+40]
+		//fmt.Printf("%s\n", peerId)
+		return string(peerId), nil
 	}
+	var peerId string
 	if initiator {
 		err := sendHandshake()
 		if err != nil {
-			return err
+			return "", err
 		}
-		err = receiveHandshake()
+		tmp, err := receiveHandshake()
 		if err != nil {
-			return err
+			return "", err
 		}
+		peerId = tmp
 	} else {
-		err := receiveHandshake()
+		tmp, err := receiveHandshake()
 		if err != nil {
-			return err
+			return "", err
 		}
+		peerId = tmp
 		err = sendHandshake()
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
-	return nil
+	return peerId, nil
 }

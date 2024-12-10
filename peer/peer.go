@@ -45,7 +45,7 @@ type Peer struct {
 	Bitmap               bitmap.Bitmap
 	Top4_lock            *sync.RWMutex
 	Connection           *comms.ConnectionState
-	New 				 bool
+	New                  bool
 }
 
 func (p Peer) String() string {
@@ -77,9 +77,6 @@ func (p *Peer) UpdateChoking(c bool) {
 }
 
 func (p *Peer) UpdatePeerChoking(c bool) {
-	if p.Peer_choking_lock == nil {
-		fmt.Printf("bruh\n")
-	}
 	p.Peer_choking_lock.Lock()
 	defer p.Peer_choking_lock.Unlock()
 	p.Peer_choking = c
