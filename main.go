@@ -2,6 +2,13 @@ package main
 
 //TODO: validate handshake we receive (sane info_hash and peer_id)
 //TODO: Currently we send one request to a single peer for each block. We have to handle the case that the peer fails or doesn't send a piece back
+//Idea for handling responses when we have multiple requests for the same block to different peers:
+//Create a outstanding request queue (sort of like chord) and when we get a piece message,
+//We check if the piece message has a corresponding request in the queue. If so, we remove
+//all requests that were asking for the same thing (same piece idx, offset; len should be the same for all messages except end of piece)
+//and send cancel messages to the peers that were the destination of these extra requests.
+//If piece messages for these requests do still come, we just ignore them.
+//The question is, do we consider these piece messages in our upload rate calculation?
 
 import (
 	"client/comms"
@@ -158,6 +165,11 @@ func main() {
 				pieceOffset := int(binary.BigEndian.Uint32(msg.Payload[4:8]))
 				switch msg.MsgType {
 				case comms.Piece:
+					//TODO: Update Peer's upload rate
+					//Either peer is sending us stuff willy-nilly or piece was completed
+					//between the time we sent a request message to this peer and we received the piece message from this peer
+					//Latter case only happens if we're sending multiple requests for the same block to different peers
+					//Should we include these messages for the calculation of peer's upload rate then?
 					if localState.Bitmap.HasPiece(int(pieceIdx)) {
 						return
 					}
