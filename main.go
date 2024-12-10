@@ -128,6 +128,10 @@ func main() {
 					peer.UpdatePeerChoking(true)
 				case comms.Unchoke:
 					peer.UpdatePeerChoking(false)
+					// add to Top 4
+					if len(localState.Top4) < 4 {
+						localState.Top4 = append(localState.Top4, localState.FindPeer(msg.PeerId))
+					}
 				case comms.Interested:
 					peer.UpdatePeerInterested(true)
 				case comms.NotInterested:
@@ -165,11 +169,6 @@ func main() {
 					f.WritePieceOffset(pieceIdx, int(pieceLength), pieceOffset, buf)
 					if f.IsPieceDownloaded(pieceIdx, int(pieceLength)) {
 						localState.Bitmap.MarkPiece(int(pieceIdx))
-
-						// add to Top 4
-						if len(localState.Top4) < 4 {
-							localState.Top4 = append(localState.Top4, localState.FindPeer(msg.PeerId))
-						}
 						//TODO: Send Have Messages to peers
 					}
 					localState.SetAmInterested()
