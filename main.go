@@ -23,6 +23,7 @@ import (
 	"math/rand"
 	"net"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -333,18 +334,24 @@ func contains(top_four []*peer.Peer, p *peer.Peer) bool {
 }
 
 func CalculateUploadRate(localState *state.State) {
-	for _, peer := range localState.Peers {
-		time_elapsed := time.Now().UnixNano() - peer.Last_time_updated
-		peer.Last_time_updated = time.Now().UnixNano()
-		if time_elapsed == 0 {
-			fmt.Println("Time elapsed is 0")
-			peer.Uploaded_bytes = 0
-			continue
-		}
-		upload_speed := float64(peer.Uploaded_bytes) / float64(time_elapsed)
-		peer.Upload_speed = upload_speed
-		peer.Uploaded_bytes = 0
+	var wg sync.WaitGroup
+	for _, p := range localState.Peers {
+		wg.Add(1)
+		go func(p peer.Peer) {
+			defer wg.Done()
+			time_elapsed := time.Now().UnixNano() - p.Last_time_updated
+			p.Last_time_updated = time.Now().UnixNano()
+			if time_elapsed == 0 {
+				fmt.Println("Time elapsed is 0")
+				p.Uploaded_bytes = 0
+				return
+			}
+			upload_speed := float64(p.Uploaded_bytes) / float64(time_elapsed)
+			p.Upload_speed = upload_speed
+			p.Uploaded_bytes = 0
+		}(p)
 	}
+	wg.Wait()
 }
 
 func weightedRandomChoice(interested_peers []*peer.Peer) int {

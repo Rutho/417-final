@@ -329,17 +329,20 @@ func (s *State) RemovePeer(PeerId string) {
 	idx := 0
 	s.PeersLock.Lock()
 	defer s.PeersLock.Unlock()
-	for p_idx := range s.Peers {
-		if strings.Compare(s.Peers[p_idx].Peer_id, PeerId) == 0 {
+	for p_idx, p := range s.Peers {
+		if strings.Compare(p.Peer_id, PeerId) == 0 {
 			idx = p_idx
 		}
 	}
+	fmt.Println(idx, len(s.Peers))
 	if idx == 0 {
 		return
 	}
-	if idx == (len(s.Peers) - 1) {
-		s.Peers = s.Peers[:len(s.Peers)-1]
+	if idx == (len(s.Peers)) {
+		s.Peers = s.Peers[:len(s.Peers)]
+		return
 	}
+	fmt.Printf("idx: %d, len: %d\n", idx, len(s.Peers))
 	s.Peers = append(s.Peers[:idx], s.Peers[idx+1:]...)
 	fmt.Printf("cool\n")
 }

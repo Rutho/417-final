@@ -8,6 +8,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Server struct {
@@ -123,8 +124,7 @@ func (s *Server) Start() {
 
 // Establishes a TCP connection and initiates BitTorrent handshake (active open)
 func (s *Server) EstablishConnection(conn *ConnectionState, disconnectCh chan string) (string, error) {
-	fmt.Println("cool\n")
-	c, err := net.Dial("tcp", fmt.Sprintf("%s:%d", conn.PeerAddress, conn.PeerPort))
+	c, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", conn.PeerAddress, conn.PeerPort), 2*time.Second)
 	if err != nil {
 		fmt.Println("EstablishConnection: dial error:", err)
 		return "", err
@@ -346,7 +346,9 @@ func (conn *ConnectionState) TwoWayHandshake(pstr string, initiator bool) (strin
 	}
 	receiveHandshake := func() (string, error) {
 		pstrlen := make([]byte, 1)
+		(*conn.Conn).SetReadDeadline(time.Now().Add(2 * time.Second))
 		_, err := (*conn.Conn).Read(pstrlen)
+		(*conn.Conn).SetReadDeadline(*new(time.Time))
 		if err != nil {
 			//fmt.Printf("ip: %s", conn.PeerAddress)
 			fmt.Printf("ip: %s, receiveHandshake: read error: %s\n", conn.PeerAddress, err)
