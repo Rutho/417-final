@@ -261,6 +261,11 @@ func main() {
 			case disconnectedPeerId := <-*disconnectCh:
 				fmt.Printf("disconnected: %s\n", disconnectedPeerId)
 				localState.RemovePeer(disconnectedPeerId)
+				localState.PeersLock.RLock()
+				localState.Top4Lock.Lock()
+				SortPeersAndUpdateTop4(&localState)
+				localState.PeersLock.RUnlock()
+				localState.Top4Lock.Unlock()
 			}
 
 			//buf, n := localState.Bitmap.Compress()
@@ -317,15 +322,17 @@ func main() {
 			fmt.Println("OptimisticUnchoking()")
 			// Lock and perform optimistic unchoking
 			localState.PeersLock.Lock()
+			localState.Top4Lock.Lock()
 			OptimisticUnchoking(&localState)
-			localState.PeersLock.Unlock()
+			localState.Top4Lock.Unlock()
+			localState.Top4Lock.Lock()
 
 		case <-calculateUploadRateTicker.C:
 			fmt.Println("CalculateUploadRate()")
 			// Lock and calculate upload rates
-			localState.PeersLock.Lock()
+			localState.PeersLock.RLock()
 			CalculateUploadRate(&localState)
-			localState.PeersLock.Unlock()
+			localState.PeersLock.RUnlock()
 
 		case <-sendKeepAliveTicker.C:
 			SendKeepAlive(&localState)
@@ -371,16 +378,7 @@ func main() {
 func OptimisticUnchoking(localState *state.State) {
 	//fmt.Println(localState)
 	if len(localState.Top4) == 4 && len(localState.Peers) > 4 {
-		// Sort the peers in descending order of upload speed. Latest unchoked peer may be a replacement
-		sort.SliceStable(localState.Peers, func(i, j int) bool {
-			return (localState.Peers)[i].Upload_speed > (localState.Peers)[j].Upload_speed
-		})
-
-		// Update the top 4. Top4 stores pointers to Peer
-		localState.Top4[0] = &localState.Peers[0]
-		localState.Top4[1] = &localState.Peers[1]
-		localState.Top4[2] = &localState.Peers[2]
-		localState.Top4[3] = &localState.Peers[3]
+		SortPeersAndUpdateTop4(localState)
 
 		// Check for any unchoked peers and choke them. Also generate a list of interested peers
 		var interested_peers []*peer.Peer
@@ -405,6 +403,34 @@ func OptimisticUnchoking(localState *state.State) {
 		optimisticPeer := interested_peers[weightedRandomChoice(interested_peers)]
 		optimisticPeer.UpdateChoking(false)
 		optimisticPeer.Connection.SendUnchoke()
+	}
+}
+
+// sort the peers based on upload speed and update the top 4
+func SortPeersAndUpdateTop4(localState *state.State) {
+	// Sort the peers in descending order of upload speed. Latest unchoked peer may be a replacement
+	sort.SliceStable(localState.Peers, func(i, j int) bool {
+		return (localState.Peers)[i].Upload_speed > (localState.Peers)[j].Upload_speed
+	})
+
+	// Update the top 4. Top4 stores pointers to Peer
+	localState.Top4 = []*peer.Peer{}
+	for i := 0; i < len(localState.Peers); i++ {
+		if len(localState.Top4) == 4 {
+			break
+		}
+		localState.Peers[i].Peer_interested_lock.RLock()
+		if localState.Peers[i].Peer_interested {
+			localState.Peers[i].Am_choking_lock.Lock()
+			if(localState.Peers[i].Am_choking) {
+				localState.Peers[i].Am_choking = false;
+				localState.Peers[i].Connection.SendUnchoke()
+			}
+			localState.Peers[i].Am_choking_lock.Unlock()
+
+			localState.Top4 = append(localState.Top4, &localState.Peers[i])
+		}
+		localState.Peers[i].Peer_interested_lock.RUnlock()
 	}
 }
 

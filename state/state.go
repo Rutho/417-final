@@ -33,6 +33,7 @@ type State struct {
 	Port        int
 	ID          string
 	PeersLock   sync.RWMutex
+	Top4Lock    sync.RWMutex
 	Peers       []peer.Peer
 	Top4        []*peer.Peer
 	BitmapLock  sync.RWMutex
