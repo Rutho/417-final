@@ -85,7 +85,7 @@ func Event_to_num(event string) int32 {
 
 func Get_addr_set_type(announce string, info *Torrent_info) (string, int) {
 
-	regstr := `(\A[a-z][a-z0-9+\-.]*:\/\/)([a-z0-9\-._~%!$&'()*+,;=]+@?[a-z0-9\-._~%]+):*(\d{4})*`
+	regstr := `(\A[a-z][a-z0-9+\-.]*:\/\/)([a-z0-9\-._~%!$&'()*+,;=]+@?[a-z0-9\-._~%]+):*(\d+)*`
 	reg := regexp.MustCompile(regstr)
 	m_list := reg.FindStringSubmatch(announce)
 	var port int
