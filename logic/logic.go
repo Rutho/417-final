@@ -22,19 +22,30 @@ func ChokeAlgorithm(s *state.State) {
 	interested := s.PeerInterested()
 	n := len(interested)
 
-	// Select the top 3 peers
-	for i := 0; i < n && i < 3; i++ {
+	// Select the top 4 peers
+	for i := 0; i < n && i < 4; i++ {
 		interested[i].Top4 = true
 	}
 
-	// Select 1 random peer
-	if (n >= 4) {
-		interested[rand.Intn(n - 3) + 3].Top4 = true
+	// Every third "cycle" (so every 30 seconds), optimistically unchoke
+	if (n >= 4 && s.Cycle == 3) {
+		s.Cycle = 0
+
+		// Remove current optimistically unchoked peer
+		for i := range s.Peers {
+			if s.Peers[i].OptimisticUnchoke == true {
+				s.Peers[i].OptimisticUnchoke = false
+				break
+			}
+		}
+
+		// Randomly select a new peer to optimistically unchoke
+		interested[rand.Intn(n - 3) + 3].OptimisticUnchoke = true
 	}
 
-	// Choke all peers except those in Top4
+	// Choke all peers except those in Top4 and/or those being optimistically unchoked
 	for i := range s.Peers {
-		if s.Peers[i].Top4 == true {
+		if s.Peers[i].Top4 == true || s.Peers[i].OptimisticUnchoke == true {
 			unchoke(&s.Peers[i])
 		} else {
 			choke(&s.Peers[i])

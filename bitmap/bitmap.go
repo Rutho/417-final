@@ -1,6 +1,9 @@
 package bitmap
 
-import "sync"
+import (
+	"sync"
+	"fmt"
+)
 
 type Bitmap struct {
 	// Description:
@@ -35,7 +38,23 @@ func (b Bitmap) String() string {
 	//   localState.Bitmap.New()
 	//   fmt.Println(localState.Bitmap)
 
-	var output string = "["
+	var output string = ""
+
+	if b.Length > 100 {
+		count_ones := 0
+		count_zeros := 0
+		for _, bit := range b.bitmap {
+			if bit == true {
+				count_ones++
+			} else {
+				count_zeros++
+			}
+		}
+		output += fmt.Sprintf("Omitted due to length. Number of 1s = %d, Number of 0s = %d\n", count_ones, count_zeros)
+		return output
+	}
+
+	output += "["
 	for _, bit := range b.bitmap {
 		if bit == true {
 			output += "1"

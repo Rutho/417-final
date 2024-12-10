@@ -23,7 +23,9 @@ type State struct {
 	//   ID      : unique 20-byte string identifier for use in tracker requests and peer handshakes.
 	//   Peers   : all the peers known to the local client (excluding self)
 	//   Top4    : pointers to the top4 peers
-	//   bitmap  : represents which pieces of the file being downloaded have been received
+	//   Bitmap  : represents which pieces of the file being downloaded have been received
+	//   BitmapLock : TODO
+	//   Cycle  : control variable for usage in Choke Algorithm
 
 	TorrentFile string
 	IP          net.IP
@@ -33,6 +35,7 @@ type State struct {
 	Peers       []peer.Peer
 	BitmapLock  sync.RWMutex
 	Bitmap      bitmap.Bitmap
+	Cycle       int
 }
 
 func (s State) String() string {
@@ -84,11 +87,6 @@ func (s State) String() string {
 	s.PeersLock.RUnlock()
 	output += "]\n"
 
-	if s.Bitmap.Length > 100 {
-		output += " |  Bitmap      : <omitted due to length>"
-	} else {
-		output += " |  Bitmap      : " + fmt.Sprintf(s.Bitmap.String())
-	}
 	s.BitmapLock.RLock()
 	output += " |  Bitmap      : " + fmt.Sprintf(s.Bitmap.String())
 	s.BitmapLock.RUnlock()

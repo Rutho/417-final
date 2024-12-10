@@ -45,6 +45,7 @@ type Peer struct {
 	Bitmap               bitmap.Bitmap
 	Top4_lock            *sync.RWMutex
 	Top4                 bool
+	OptimisticUnchoke    bool
 	Connection           *comms.ConnectionState
 }
 

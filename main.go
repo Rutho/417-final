@@ -58,6 +58,9 @@ func main() {
 	// Generate an ID
 	localState.GenerateID()
 
+	// For use in Choke Algorithm
+	localState.Cycle = 0
+
 	// Store the peer list into the State struct
 	// --------
 
