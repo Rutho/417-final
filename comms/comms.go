@@ -186,6 +186,7 @@ func (s *Server) acceptLoop() {
 // Writes the packet + metadata (based on Packet struct) to the msg channel
 func (s *Server) ReadLoop(conn *ConnectionState) error {
 	c := bufio.NewReader(*conn.Conn)
+	defer (*conn.Conn).Close()
 	for {
 		msgLenBuf := make([]byte, 4)
 		msgLenN, err := c.Read(msgLenBuf)

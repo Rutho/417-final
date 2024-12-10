@@ -305,7 +305,7 @@ func main() {
 	// Tickers for periodic tasks
 	optimisticUnchokingTicker := time.NewTicker(30 * time.Second)
 	calculateUploadRateTicker := time.NewTicker(10 * time.Second)
-	sendKeepAliveTicker := time.NewTicker(50 * time.Second)
+	sendKeepAliveTicker := time.NewTicker(30 * time.Second)
 	printLocalStateTicker := time.NewTicker(30 * time.Second)
 	var sendTrackerRequestTicker *time.Ticker
 	if response_info.Min_interval != 0 {
@@ -335,8 +335,8 @@ func main() {
 			localState.PeersLock.RUnlock()
 
 		case <-sendKeepAliveTicker.C:
+			fmt.Println("sendKeepAlive()")
 			SendKeepAlive(&localState)
-
 		case <-printLocalStateTicker.C:
 			localState.PeersLock.RLock()
 			fmt.Println(localState)
@@ -448,7 +448,7 @@ func CalculateUploadRate(localState *state.State) {
 	var wg sync.WaitGroup
 	for i := range localState.Peers {
 		wg.Add(1)
-		go func(p peer.Peer) {
+		go func(p *peer.Peer) {
 			defer wg.Done()
 			time_elapsed := time.Now().UnixNano() - p.Last_time_updated
 			p.Last_time_updated = time.Now().UnixNano()
@@ -460,7 +460,7 @@ func CalculateUploadRate(localState *state.State) {
 			upload_speed := float64(p.Uploaded_bytes) / float64(time_elapsed)
 			p.Upload_speed = upload_speed
 			p.Uploaded_bytes = 0
-		}(localState.Peers[i])
+		}(&localState.Peers[i])
 	}
 	wg.Wait()
 }
