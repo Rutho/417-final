@@ -371,12 +371,12 @@ func main() {
 func OptimisticUnchoking(localState *state.State) {
 	//fmt.Println(localState)
 	if len(localState.Top4) == 4 && len(localState.Peers) > 4 {
-		// Update the top 4 peers. Latest unchoked peer may be a replacement
-		sort.Slice(localState.Peers, func(i, j int) bool {
-			return (localState.Peers)[i].Upload_speed < (localState.Peers)[j].Upload_speed
+		// Sort the peers in descending order of upload speed. Latest unchoked peer may be a replacement
+		sort.SliceStable(localState.Peers, func(i, j int) bool {
+			return (localState.Peers)[i].Upload_speed > (localState.Peers)[j].Upload_speed
 		})
 
-		// Top4 stores pointers to Peer
+		// Update the top 4. Top4 stores pointers to Peer
 		localState.Top4[0] = &localState.Peers[0]
 		localState.Top4[1] = &localState.Peers[1]
 		localState.Top4[2] = &localState.Peers[2]
@@ -408,6 +408,7 @@ func OptimisticUnchoking(localState *state.State) {
 	}
 }
 
+// check if the given peer is in the top 4
 func contains(top_four []*peer.Peer, p *peer.Peer) bool {
 	for _, v := range top_four {
 		if v.Ip.Equal(p.Ip) && v.Port == p.Port {
@@ -438,12 +439,8 @@ func CalculateUploadRate(localState *state.State) {
 	wg.Wait()
 }
 
+// Assigns a weight to each interested peer. New peers are 3x more likely to be chosen
 func weightedRandomChoice(interested_peers []*peer.Peer) int {
-	/*
-		Assigns a weight to each interested peer
-		New peers are 3x more likely to be chosen
-	*/
-
 	// Step 1: Assign weights
 	weights := make([]float64, len(interested_peers))
 	totalWeight := 0.0
