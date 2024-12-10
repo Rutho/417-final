@@ -3,8 +3,10 @@
 package comms
 
 import (
+	"bufio"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -74,7 +76,7 @@ func NewServer(localPort int, maxPktSize uint32, serverId string, infoHash []byt
 		localAddress: net.ParseIP("127.0.0.1"),
 		localPort:    localPort,
 		quitCh:       make(chan struct{}),
-		MsgCh:        make(chan Message, 100),
+		MsgCh:        make(chan Message, 50),
 		maxPktSize:   maxPktSize,
 		serverId:     serverId,
 		infoHash:     infoHash,
@@ -177,19 +179,22 @@ func (s *Server) acceptLoop() {
 // Reads packets received from the given connection
 // Writes the packet + metadata (based on Packet struct) to the msg channel
 func (s *Server) ReadLoop(conn *ConnectionState) error {
+	c := bufio.NewReader(*conn.Conn)
 	for {
 		msgLenBuf := make([]byte, 4)
-		msgLenN, err := (*conn.Conn).Read(msgLenBuf)
+		msgLenN, err := c.Read(msgLenBuf)
+		fmt.Printf("%v\n", msgLenBuf)
+		fmt.Printf("msg len: %d\n", msgLenN)
 		if msgLenN != 4 || err != nil {
 			fmt.Printf("ip: %s, readloop: read error: %s\n", conn.PeerAddress, err)
-			(*conn.Conn).Close()
 			return err
 		}
 		msgLen := binary.BigEndian.Uint32(msgLenBuf)
 		var buf []byte
 		if msgLen != 0 {
 			payloadBuf := make([]byte, msgLen)
-			_, err := (*conn.Conn).Read(payloadBuf)
+			n, err := io.ReadFull(c, payloadBuf)
+			fmt.Printf("read %d bytes\n", n)
 			if err != nil {
 				fmt.Println("message payload: read error:", err)
 			}
@@ -346,7 +351,7 @@ func (conn *ConnectionState) TwoWayHandshake(pstr string, initiator bool) (strin
 	}
 	receiveHandshake := func() (string, error) {
 		pstrlen := make([]byte, 1)
-		(*conn.Conn).SetReadDeadline(time.Now().Add(2 * time.Second))
+		(*conn.Conn).SetReadDeadline(time.Now().Add(4 * time.Second))
 		_, err := (*conn.Conn).Read(pstrlen)
 		(*conn.Conn).SetReadDeadline(*new(time.Time))
 		if err != nil {

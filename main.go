@@ -84,8 +84,8 @@ func main() {
 	s := comms.NewServer(localState.Port, 2048, string(request_info.Peer_id), request_info.Info_hash)
 	go s.Start()
 
-	peerMsgCh := make(chan comms.Message, 60)
-	stateMsgCh := make(chan comms.Message, 100)
+	peerMsgCh := make(chan comms.Message, 50)
+	stateMsgCh := make(chan comms.Message, 50)
 
 	//Message Filtering
 	//Filters peer-specific messages to peerMsgCh and
@@ -211,8 +211,8 @@ func main() {
 		}
 	}(stateMsgCh)
 
-	establishCh := make(chan peer.Peer, 60)
-	disconnectCh := make(chan string, 100)
+	establishCh := make(chan peer.Peer, 30)
+	disconnectCh := make(chan string, 50)
 
 	go func() {
 		for {
