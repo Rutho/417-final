@@ -85,7 +85,7 @@ func (p *Peer) UpdatePeerChoking(c bool) {
 func (p *Peer) UpdateInterested(c bool) {
 	p.Am_interested_lock.Lock()
 	defer p.Am_interested_lock.Unlock()
-	p.Peer_choking = c
+	p.Am_interested = c
 }
 
 func (p *Peer) UpdatePeerInterested(c bool) {
