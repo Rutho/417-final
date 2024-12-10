@@ -53,7 +53,7 @@ func main() {
 	request_info.Key = "wow"
 	torrent_file.Tracker_Type = data.HTTP
 	data.Send_get(request_info, torrent_file, response_info)
-
+	fmt.Println(response_info.Interval)
 	infoHashStr := torrent_file.Info["pieces"].(string)
 	f := filemanager.Open(torrent_file.Info["name"].(string), []byte(infoHashStr))
 	fmt.Printf("Saving to %s\n", f.Filename)
@@ -269,6 +269,17 @@ func main() {
 	// Tickers for periodic tasks
 	optimisticUnchokingTicker := time.NewTicker(30 * time.Second)
 	calculateUploadRateTicker := time.NewTicker(10 * time.Second)
+	sendKeepAliveTicker := time.NewTicker(50 * time.Second)
+	printLocalStateTicker := time.NewTicker(30 * time.Second)
+	var sendTrackerRequestTicker *time.Ticker
+	if response_info.Min_interval != 0 {
+		sendTrackerRequestTicker = time.NewTicker(time.Duration(response_info.Min_interval) * time.Second)
+	} else if response_info.Interval != 0 {
+		sendTrackerRequestTicker = time.NewTicker(time.Duration(response_info.Interval) * time.Second)
+	} else {
+		sendTrackerRequestTicker = time.NewTicker(100 * time.Second)
+	}
+
 	for {
 		select {
 		case <-optimisticUnchokingTicker.C:
@@ -284,7 +295,21 @@ func main() {
 			localState.PeersLock.Lock()
 			CalculateUploadRate(&localState)
 			localState.PeersLock.Unlock()
+
+		case <-sendKeepAliveTicker.C:
+			SendKeepAlive(&localState)
+
+		case <-printLocalStateTicker.C:
+			localState.PeersLock.RLock()
+			fmt.Println(localState)
+			localState.PeersLock.RUnlock()
+		case <-sendTrackerRequestTicker.C:
+			fmt.Println("sendTrackerRequest()")
+			go func() {
+				data.Send_get(request_info, torrent_file, response_info)
+			}()
 		}
+
 	}
 }
 
@@ -388,4 +413,12 @@ func weightedRandomChoice(interested_peers []*peer.Peer) int {
 		}
 	}
 	return len(interested_peers) - 1 // Fallback in case of rounding errors
+}
+
+func SendKeepAlive(s *state.State) {
+	s.PeersLock.RLock()
+	for i := range s.Peers {
+		s.Peers[i].Connection.SendKeepAlive()
+	}
+	s.PeersLock.RUnlock()
 }

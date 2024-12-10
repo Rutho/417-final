@@ -322,6 +322,13 @@ func Send_http(request *Tracker_request, ip string, g_port int, response *Tracke
 		fmt.Println("no interval")
 	}
 
+	minInterval, ok := ben_data["min interval"].(int64)
+	if ok {
+		response.Min_interval = int(minInterval)
+	} else {
+		fmt.Println("no min interval")
+	}
+
 	peer_string, ok := ben_data["peers"].(string)
 
 	if ok {

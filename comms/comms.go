@@ -126,7 +126,7 @@ func (s *Server) Start() {
 
 // Establishes a TCP connection and initiates BitTorrent handshake (active open)
 func (s *Server) EstablishConnection(conn *ConnectionState, disconnectCh chan string) (string, error) {
-	c, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", conn.PeerAddress, conn.PeerPort), 2*time.Second)
+	c, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", conn.PeerAddress, conn.PeerPort), 7*time.Second)
 	if err != nil {
 		fmt.Println("EstablishConnection: dial error:", err)
 		return "", err
@@ -184,10 +184,9 @@ func (s *Server) ReadLoop(conn *ConnectionState) error {
 		msgLenBuf := make([]byte, 4)
 		msgLenN, err := c.Read(msgLenBuf)
 		fmt.Printf("%v\n", msgLenBuf)
-		fmt.Printf("msg len: %d\n", msgLenN)
 		if msgLenN != 4 || err != nil {
 			fmt.Printf("ip: %s, readloop: read error: %s\n", conn.PeerAddress, err)
-			return err
+			continue
 		}
 		msgLen := binary.BigEndian.Uint32(msgLenBuf)
 		var buf []byte

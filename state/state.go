@@ -111,7 +111,7 @@ func (s *State) ParseClargs() {
 
 	// Define -t <torrent file>
 	// Default value "debian-12.8.0-amd64-DVD-1.iso.torrent"
-	s.TorrentFile = *flag.String("t", "debian-12.8.0-amd64-DVD-1.iso.torrent", "filepath/name of torrent file")
+	t := flag.String("t", "debian-12.8.0-amd64-DVD-1.iso.torrent", "filepath/name of torrent file")
 
 	// Define -p <port number>
 	// Default value 8080 (BitTorrent typically uses 6881-6889, and 6969 for tracker)
@@ -119,6 +119,7 @@ func (s *State) ParseClargs() {
 
 	// Parse the command line into the defined flags
 	flag.Parse()
+	s.TorrentFile = *t
 }
 
 func (s *State) GenerateID() string {
@@ -342,7 +343,5 @@ func (s *State) RemovePeer(PeerId string) {
 		s.Peers = s.Peers[:len(s.Peers)]
 		return
 	}
-	fmt.Printf("idx: %d, len: %d\n", idx, len(s.Peers))
 	s.Peers = append(s.Peers[:idx], s.Peers[idx+1:]...)
-	fmt.Printf("cool\n")
 }
