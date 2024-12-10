@@ -19,6 +19,7 @@ type Server struct {
 	ln           net.Listener
 	quitCh       chan struct{}
 	MsgCh        chan Message
+	DisconnectCh chan string
 	maxPktSize   uint32
 	serverId     string
 	infoHash     []byte
@@ -77,6 +78,7 @@ func NewServer(localPort int, maxPktSize uint32, serverId string, infoHash []byt
 		localPort:    localPort,
 		quitCh:       make(chan struct{}),
 		MsgCh:        make(chan Message, 50),
+		DisconnectCh: make(chan string, 40),
 		maxPktSize:   maxPktSize,
 		serverId:     serverId,
 		infoHash:     infoHash,
@@ -162,12 +164,16 @@ func (s *Server) acceptLoop() {
 		go func() {
 			conn := NewConnectionState(net.IP(fromAddressString), fromPort, "", s.serverId, s.infoHash, &c)
 			fmt.Printf("established connection with %s\n", c.RemoteAddr())
-			_, err := conn.TwoWayHandshake("BitTorrent protocol", false)
+			peerId, err := conn.TwoWayHandshake("BitTorrent protocol", false)
+			conn.PeerId = peerId
 			//peer.Peer.
 			//Handle Peers connecting to us
 			if err == nil {
 				go func() {
-					s.ReadLoop(conn)
+					err := s.ReadLoop(conn)
+					if err != nil {
+						s.DisconnectCh <- conn.PeerId
+					}
 				}()
 			}
 
@@ -253,6 +259,7 @@ func (conn *ConnectionState) SendChoke() {
 
 func (conn *ConnectionState) SendUnchoke() {
 	var unchokeMsg Message
+	fmt.Printf("abc\n")
 	unchokeMsg.MsgLength = 1
 	unchokeMsg.MsgType = 1
 	conn.sendMessage(unchokeMsg)
