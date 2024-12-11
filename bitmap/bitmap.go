@@ -59,12 +59,14 @@ type Block struct {
 	//   PieceIndex : the index of the piece that this block belongs to
 	//   Offset     : the byte offset into the piece
 	//   Length     : number of bytes this block is
+	//   Block_lock : for thread safety
 	//   Complete   : whether the block is received
 	//   Incomplete : whether the block is received
 
 	PieceIndex int
 	Offset     int64
 	Length     int64
+	Block_lock *sync.RWMutex
 
 	Complete   bool
 	Incomplete bool
@@ -475,6 +477,11 @@ func (a *Block) Equals(b *Block) bool {
 	// Description:
 	//
 	//    method on the Block struct that returns true if a and b are equal
+
+	a.Block_lock.RLock()
+	b.Block_lock.RLock()
+	defer a.Block_lock.RUnlock()
+	defer b.Block_lock.RUnlock()
 
 	return a.PieceIndex == b.PieceIndex && a.Offset == b.Offset && a.Length == b.Length
 }

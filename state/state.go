@@ -40,6 +40,7 @@ type State struct {
 	Top4         []*peer.Peer
 	BitmapLock   sync.RWMutex
 	Bitmap       bitmap.Bitmap
+	RequestLock  sync.RWMutex
 	RequestQueue []request.Request
 	PieceHashes  []byte
 	PieceLength  int64
@@ -202,7 +203,7 @@ func (s *State) RemovePeer(peer_id string) {
 	s.Peers.RemovePeerByID(peer_id)
 }
 
-func (s *State) SendARequest() {
+func (s *State) SendARequest() bool {
 	// Description:
 	//
 	//   method on the State struct to send a request to a peer for a piece.
@@ -214,25 +215,32 @@ func (s *State) SendARequest() {
 	//
 	// Returns:
 	//
-	//   nothing
+	//   true if no more requests should be sent
 	//
 	// Example usage:
 	//
 	//   localState.SendARequest()
 
+	s.PeersLock.Lock()
+	s.BitmapLock.Lock()
+	s.RequestLock.Lock()
+	defer s.PeersLock.Unlock()
+	defer s.BitmapLock.Unlock()
+	defer s.RequestLock.Unlock()
+
 	if s.Bitmap.AllDownloaded() {
-		return
+		return true
 	}
 
 	if len(s.RequestQueue) >= request.QueueSize {
-		return
+		return false
 	}
 
 	peer := request.SelectPeer(&s.Peers)
 
 	if peer == nil {
 		fmt.Println("Tried to SendARequest() but no peer was found!")
-		return
+		return false
 	}
 
 	piece_index := request.SelectPiece(peer, &s.Bitmap)
@@ -250,6 +258,8 @@ func (s *State) SendARequest() {
 	b.PieceIndex = piece_index
 	b.Offset     = s.Bitmap.Pieces[piece_index].Pending
 	b.Length     = min
+	b.Block_lock = new(sync.RWMutex)
+
 	b.Complete   = false
 	b.Incomplete = true
 
@@ -262,6 +272,7 @@ func (s *State) SendARequest() {
 	r.Peer      = peer
 	r.Cancelled = false
 	r.Timestamp = time.Now().Unix()
+	r.Request_lock = new(sync.RWMutex)
 
 	// Add the request to the queue
 	s.RequestQueue = append(s.RequestQueue, *r)
@@ -269,5 +280,6 @@ func (s *State) SendARequest() {
 	peer.Connection.SendRequest(uint32(piece_index), uint32(b.Offset), uint32(b.Length))
 
 	fmt.Printf("Sent a request to %s\n", peer)
+	return false
 }
 

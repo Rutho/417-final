@@ -4,6 +4,7 @@ import (
 	"client/bitmap"
 	"client/peer"
 	"math/rand"
+	"sync"
 )
 
 const MaxBlockSize = 16384 // Maximum block size, in bytes
@@ -21,11 +22,13 @@ type Request struct {
 	//   Peer      : pointer to the peer that the request was sent to
 	//   Cancelled : if this request is cancelled. Initially false
 	//   Timestamp : number of seconds since the Unix epoch
+	//   Request_lock : for thread safety
 
 	Block      bitmap.Block
 	Peer       *peer.Peer
 	Cancelled  bool
 	Timestamp  int64
+	Request_lock *sync.RWMutex
 }
 
 func SelectPiece(p *peer.Peer, self *bitmap.Bitmap) int {
@@ -101,4 +104,24 @@ func SelectPeer(pl *peer.Peers) *peer.Peer {
 	rand_idx := rand.Intn(len(interested_peers))
 
 	return &interested_peers[rand_idx]
+}
+
+func Cancel(rq []Request) {
+	// Description:
+	//
+	//   function to cancel in-flight outgoing requests
+	//
+	// Parameters:
+	//
+	//   a list of pending requests
+	//
+	// Returns:
+	//
+	//   nothing
+	//
+	// Example usage:
+	//
+	//   TODO
+
+	// TODO
 }

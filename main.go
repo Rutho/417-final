@@ -188,6 +188,9 @@ func main() {
 				pieceOffset := int(binary.BigEndian.Uint32(msg.Payload[4:8]))
 				switch msg.MsgType {
 				case comms.Piece:
+					if localState.Bitmap.AllDownloaded() {
+						break // ignore the piece
+					}
 					//TODO: Update Peer's upload rate
 					//Either peer is sending us stuff willy-nilly or piece was completed
 					//between the time we sent a request message to this peer and we received the piece message from this peer
@@ -300,7 +303,9 @@ func main() {
 	requestTicker := time.NewTicker(1 * time.Second)
 	go func() {
 		for range requestTicker.C {
-			localState.SendARequest()
+			if localState.SendARequest() {
+				requestTicker.Stop()
+			}
 		}
 	}()
 
@@ -319,8 +324,8 @@ func main() {
 	// Tickers for periodic tasks
 	optimisticUnchokingTicker := time.NewTicker(30 * time.Second)
 	calculateUploadRateTicker := time.NewTicker(10 * time.Second)
-	sendKeepAliveTicker := time.NewTicker(30 * time.Second)
-	printLocalStateTicker := time.NewTicker(30 * time.Second)
+	sendKeepAliveTicker       := time.NewTicker(30 * time.Second)
+	printLocalStateTicker     := time.NewTicker(30 * time.Second)
 	var sendTrackerRequestTicker *time.Ticker
 	if response_info.Min_interval != 0 {
 		sendTrackerRequestTicker = time.NewTicker(time.Duration(response_info.Min_interval) * time.Second)
