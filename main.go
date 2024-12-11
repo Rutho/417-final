@@ -16,6 +16,7 @@ import (
 	"client/filemanager"
 	"client/peer"
 	"client/state"
+	"client/request"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -305,7 +306,10 @@ func main() {
 	go func() {
 		for range requestTicker.C {
 			if localState.SendARequest() {
+				// Stop sending requests
 				requestTicker.Stop()
+				// Cancel outgoing requests
+				request.Cancel(&localState.RequestQueue)
 			}
 		}
 	}()

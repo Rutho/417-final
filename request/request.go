@@ -123,9 +123,12 @@ func Cancel(rq *[]Request) {
 	//
 	//   TODO
 
-	// for i := range *rq {
-	// 	// rq
-	// }
+	for i := range *rq {
+		piece_index := (*rq)[i].Block.PieceIndex
+		offset      := (*rq)[i].Block.Offset
+		length      := (*rq)[i].Block.Length
+		(*rq)[i].Peer.Connection.SendCancel(uint32(piece_index), uint32(offset), uint32(length))
+	}
 
 	*rq = nil
 }

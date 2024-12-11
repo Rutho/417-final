@@ -322,12 +322,12 @@ func (conn *ConnectionState) SendKeepAlive() {
 	}
 }
 
-func (conn *ConnectionState) SendCancel(pieceIdx uint32, start_offset uint32, n int) {
+func (conn *ConnectionState) SendCancel(pieceIdx uint32, start_offset uint32, n uint32) {
 	var cancelMsg Message
 	cancelMsg.MsgLength = 13
 	cancelMsg.MsgType = 8
 	cancelMsg.Payload = make([]byte, 4)
-	binary.BigEndian.PutUint32(cancelMsg.Payload, uint32(n))
+	binary.BigEndian.PutUint32(cancelMsg.Payload, n)
 	conn.sendMessage(cancelMsg)
 }
 
