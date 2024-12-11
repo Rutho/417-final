@@ -166,12 +166,6 @@ func (s *State) GenerateID() string {
 	return s.ID
 }
 
-func (s *State) FindPeer(peer_id string) *peer.Peer {
-	s.PeersLock.RLock()
-	defer s.PeersLock.RUnlock()
-	return s.Peers.FindPeerByID(peer_id)
-}
-
 func (s *State) FindPeerByAddr(peerAddress net.IP, port int) *peer.Peer {
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()

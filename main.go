@@ -112,7 +112,7 @@ func main() {
 	go func(msgCh chan comms.Message) {
 		for msg := range msgCh {
 			//fmt.Printf("peer address: %s\n", msg.PeerAddress)
-			peer := localState.FindPeer(msg.PeerId)
+			peer := localState.Peers.FindPeerByID(msg.PeerId)
 			switch msg.MsgType {
 			case comms.Bitfield:
 				//Bitfield size can differ a little from numberOfPieces since
@@ -154,7 +154,7 @@ func main() {
 				peer.UpdatePeerChoking(false)
 				// add to Top 4
 				if len(localState.Top4) < 4 {
-					p := localState.FindPeer(msg.PeerId)
+					p := localState.Peers.FindPeerByID(msg.PeerId)
 					localState.Top4 = append(localState.Top4, p)
 					p.UpdateChoking(false)
 					p.Connection.SendUnchoke()
@@ -193,7 +193,7 @@ func main() {
 					//between the time we sent a request message to this peer and we received the piece message from this peer
 					//Latter case only happens if we're sending multiple requests for the same block to different peers
 					//Should we include these messages for the calculation of peer's upload rate then? YES
-					p := localState.FindPeer(msg.PeerId)
+					p := localState.Peers.FindPeerByID(msg.PeerId)
 					fmt.Printf("Received a Piece from %s\n", p)
 					if localState.Bitmap.Pieces[int(pieceIdx)].Incomplete() {
 						buf := msg.Payload[8:]
@@ -230,7 +230,7 @@ func main() {
 						p.Connection.SendNotInterested()
 					}
 				case comms.Request:
-					peer := localState.FindPeer(msg.PeerId)
+					peer := localState.Peers.FindPeerByID(msg.PeerId)
 					if !localState.Bitmap.Pieces[int(pieceIdx)].Complete() || peer.Am_choking {
 						return
 					}

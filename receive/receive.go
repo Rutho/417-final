@@ -3,10 +3,11 @@ package receive
 import (
 	"client/bitmap"
 	"client/state"
+	"client/peer"
 )
 
 
-func Process(s *state.State, piece_index int, piece_offset int, buf []byte) {
+func Process(s *state.State, p *peer.Peer, piece_index int, piece_offset int, buf []byte) {
 	// Description:
 	//
 	//   Handle the procedure upon receiving a Piece from a peeer
@@ -58,4 +59,7 @@ func Process(s *state.State, piece_index int, piece_offset int, buf []byte) {
 	// Remove the Request from RequestQueue
 	s.RequestQueue[i] = s.RequestQueue[len(s.RequestQueue)-1]
 	s.RequestQueue = s.RequestQueue[:len(s.RequestQueue)-1]
+
+	// Update the peer's upload rate
+	p.Uploaded_bytes += len(buf)
 }
