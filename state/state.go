@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net"
 	"sync"
+	"time"
 )
 
 type State struct {
@@ -266,10 +267,7 @@ func (s *State) SendARequest() {
 	r.Cancelled = false
 	r.Timestamp = time.Now().Unix()
 
-<<<<<<< HEAD
-=======
 	// Add the request to the queue
->>>>>>> refs/remotes/origin/main
 	s.RequestQueue = append(s.RequestQueue, *r)
 
 	peer.Connection.SendRequest(uint32(piece_index), uint32(b.Offset), uint32(b.Length))
