@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net"
 	"sync"
+	"time"
 )
 
 type State struct {
@@ -242,7 +243,7 @@ func (s *State) SendARequest() {
 
 	// The last block may be smaller in size
 	var min int64
-	if request.MaxBlockSize < s.Bitmap.Pieces[piece_index].Length - s.Bitmap.Pieces[piece_index].Pending {
+	if request.MaxBlockSize < s.Bitmap.Pieces[piece_index].Length-s.Bitmap.Pieces[piece_index].Pending {
 		min = request.MaxBlockSize
 	} else {
 		min = s.Bitmap.Pieces[piece_index].Length - s.Bitmap.Pieces[piece_index].Pending
@@ -251,9 +252,9 @@ func (s *State) SendARequest() {
 	// Make a new block
 	b := new(bitmap.Block)
 	b.PieceIndex = piece_index
-	b.Offset     = s.Bitmap.Pieces[piece_index].Pending
-	b.Length     = min
-	b.Complete   = false
+	b.Offset = s.Bitmap.Pieces[piece_index].Pending
+	b.Length = min
+	b.Complete = false
 	b.Incomplete = true
 
 	// Increase pending bytes
@@ -261,17 +262,46 @@ func (s *State) SendARequest() {
 
 	// Make a new request
 	r := new(request.Request)
-	r.Block     = *b
-	r.Peer      = peer
+	r.Block = *b
+	r.Peer = peer
 	r.Cancelled = false
 	r.Timestamp = time.Now().Unix()
 
-<<<<<<< HEAD
-=======
 	// Add the request to the queue
->>>>>>> refs/remotes/origin/main
 	s.RequestQueue = append(s.RequestQueue, *r)
 
 	peer.Connection.SendRequest(uint32(piece_index), uint32(b.Offset), uint32(b.Length))
 }
 
+func (s State) PrintTop4() {
+	// Description:
+	//
+	//   method on the State struct that provides a human-readable string representation
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   A string containing the formatted State information
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   localState.ParseClargs()
+	//   fmt.Println(localState)
+
+	var output string = "Top4:\n"
+
+	for i, peer := range s.Top4 {
+		if i == 0 {
+			output += fmt.Sprintf("%s uploadSpeed:%.2f", peer, peer.Upload_speed)
+		} else {
+			output += fmt.Sprintf(", %s uploadSpeed:%.2f", peer, peer.Upload_speed)
+		}
+	}
+	output += "]\n"
+
+	fmt.Println(output)
+}
