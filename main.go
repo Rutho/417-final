@@ -323,6 +323,15 @@ func main() {
 	go func() {
 		localState.SendARequest()
 	}()
+
+	sendKeepAliveTicker := time.NewTicker(30 * time.Second)
+	go func() {
+		for {
+			<-sendKeepAliveTicker.C
+			fmt.Println("sendKeepAlive()")
+			SendKeepAlive(&localState)
+		}
+	}()
 	/*
 		Call Optimistic Unchoking every 30 seconds.
 		Calculate the upload rate of every peer every 10 seconds
@@ -331,7 +340,6 @@ func main() {
 	// Tickers for periodic tasks
 	optimisticUnchokingTicker := time.NewTicker(30 * time.Second)
 	calculateUploadRateTicker := time.NewTicker(10 * time.Second)
-	sendKeepAliveTicker := time.NewTicker(30 * time.Second)
 	printLocalStateTicker := time.NewTicker(30 * time.Second)
 	var sendTrackerRequestTicker *time.Ticker
 	upcomingPanicRequest := false
