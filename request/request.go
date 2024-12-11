@@ -20,10 +20,12 @@ type Request struct {
 	//   Block     : the requested block
 	//   Peer      : pointer to the peer that the request was sent to
 	//   Cancelled : if this request is cancelled. Initially false
+	//   Timestamp : number of seconds since the Unix epoch
 
 	Block      bitmap.Block
 	Peer       *peer.Peer
 	Cancelled  bool
+	Timestamp  int64
 }
 
 func SelectPiece(p *peer.Peer, self *bitmap.Bitmap) int {
