@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-type PeerList struct {
+type Peers struct {
 	// Description:
 	//
 	//   structure that stores a list of peers
@@ -84,10 +84,10 @@ func (p Peer) String() string {
 
 
 
-func (pl *PeerList) FindPeerByID(peer_id string) *Peer {
+func (pl *Peers) FindPeerByID(peer_id string) *Peer {
 	// Description:
 	//
-	//   method on the PeerList struct to find a peer by ID
+	//   method on the Peers struct to find a peer by ID
 	//
 	// Parameters:
 	//
@@ -100,7 +100,7 @@ func (pl *PeerList) FindPeerByID(peer_id string) *Peer {
 	// Example usage:
 	//
 	//   var localState State
-	//   peer := localState.PeerList.FindPeerByID("-RFRA00-WZW3JVR4dIv3")
+	//   peer := localState.Peers.FindPeerByID("-RFRA00-WZW3JVR4dIv3")
 	//   fmt.Println(peer)
 
 	for i := range pl.List {
@@ -111,10 +111,10 @@ func (pl *PeerList) FindPeerByID(peer_id string) *Peer {
 	return nil
 }
 
-func (pl *PeerList) FindPeerByAddr(peer_address net.IP, port int) *Peer {
+func (pl *Peers) FindPeerByAddr(peer_address net.IP, port int) *Peer {
 	// Description:
 	//
-	//   method on the PeerList struct to find a peer by IP address and port
+	//   method on the Peers struct to find a peer by IP address and port
 	//
 	// Parameters:
 	//
@@ -127,7 +127,7 @@ func (pl *PeerList) FindPeerByAddr(peer_address net.IP, port int) *Peer {
 	// Example usage:
 	//
 	//   var localState State
-	//   peer := localState.PeerList.FindPeerByID("-RFRA00-WZW3JVR4dIv3")
+	//   peer := localState.Peers.FindPeerByID("-RFRA00-WZW3JVR4dIv3")
 	//   fmt.Println(peer)
 
 	for i := range pl.List {
@@ -138,10 +138,10 @@ func (pl *PeerList) FindPeerByAddr(peer_address net.IP, port int) *Peer {
 	return nil
 }
 
-func (pl *PeerList) PeerInterested() []Peer {
+func (pl *Peers) PeerInterested() []Peer {
 	// Description:
 	//
-	//   method on the PeerList struct to get all the interested peers
+	//   method on the Peers struct to get all the interested peers
 	//
 	// Parameters:
 	//
@@ -154,7 +154,7 @@ func (pl *PeerList) PeerInterested() []Peer {
 	// Example usage:
 	//
 	//   var localState State
-	//   for _, peer := localState.PeerList.PeerInterested() {
+	//   for _, peer := localState.Peers.PeerInterested() {
 	//       process(peer)
 	//   }
 
@@ -167,10 +167,10 @@ func (pl *PeerList) PeerInterested() []Peer {
 	return output
 }
 
-func (pl *PeerList) PeerChoking() []Peer {
+func (pl *Peers) PeerChoking() []Peer {
 	// Description:
 	//
-	//   method on the PeerList struct to get all the peers who are choking us
+	//   method on the Peers struct to get all the peers who are choking us
 	//
 	// Parameters:
 	//
@@ -196,10 +196,10 @@ func (pl *PeerList) PeerChoking() []Peer {
 	return output
 }
 
-func (pl *PeerList) AmInterested() []Peer {
+func (pl *Peers) AmInterested() []Peer {
 	// Description:
 	//
-	//   method on the PeerList struct to get all the peers who we are interested in
+	//   method on the Peers struct to get all the peers who we are interested in
 	//
 	// Parameters:
 	//
@@ -225,10 +225,10 @@ func (pl *PeerList) AmInterested() []Peer {
 	return output
 }
 
-func (pl *PeerList) AmChoking() []Peer {
+func (pl *Peers) AmChoking() []Peer {
 	// Description:
 	//
-	//   method on the PeerList struct to get all the peers who we are choking
+	//   method on the Peers struct to get all the peers who we are choking
 	//
 	// Parameters:
 	//
@@ -254,7 +254,7 @@ func (pl *PeerList) AmChoking() []Peer {
 	return output
 }
 
-func (pl *PeerList) RemovePeerByID(peer_id string) {
+func (pl *Peers) RemovePeerByID(peer_id string) {
 	idx := 0
 	for p_idx, p := range pl.List {
 		if strings.Compare(p.Peer_id, peer_id) == 0 {

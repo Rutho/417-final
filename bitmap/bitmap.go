@@ -99,7 +99,7 @@ func (b Bitmap) String() string {
 				count_zeros++
 			}
 		}
-		output += fmt.Sprintf("Omitted due to length. Number of 1s = %d, Number of 0s = %d\n", count_ones, count_zeros)
+		output += fmt.Sprintf("Omitted due to length (number of 1s = %d, number of 0s = %d)\n", count_ones, count_zeros)
 		return output
 	}
 

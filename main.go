@@ -81,6 +81,7 @@ func main() {
 	// Store the Info_hash
 	localState.Info_hash = request_info.Info_hash
 
+
 	// Store the peer list into the State struct
 	// --------
 
@@ -201,8 +202,8 @@ func main() {
 						if f.IsPieceDownloaded(pieceIdx, int(pieceLength)) {
 							localState.Bitmap.MarkPiece(int(pieceIdx))
 							localState.PeersLock.Lock()
-							for i := range localState.PeerList.List {
-								localState.PeerList.List[i].Connection.SendHave(pieceIdx)
+							for i := range localState.Peers.List {
+								localState.Peers.List[i].Connection.SendHave(pieceIdx)
 								go func(p *peer.Peer) {
 									extra, _ := localState.Bitmap.HasExtraPieces(&p.Bitmap)
 									if !extra && p.Peer_interested {
@@ -254,7 +255,7 @@ func main() {
 			select {
 			case connectedPeer := <-establishCh:
 				localState.PeersLock.Lock()
-				localState.PeerList.List = append(localState.PeerList.List, connectedPeer) //deep copy
+				localState.Peers.List = append(localState.Peers.List, connectedPeer) //deep copy
 				localState.PeersLock.Unlock()
 				go func() {
 					err := s.ReadLoop(connectedPeer.Connection)
@@ -296,7 +297,7 @@ func main() {
 
 	time.Sleep(20000000000)
 
-	//fmt.Println(localState)
+	fmt.Println(localState)
 	fmt.Println(torrent_file.Announce)
 
 	fmt.Println("Hello!!!")
@@ -314,7 +315,7 @@ func main() {
 	var sendTrackerRequestTicker *time.Ticker
 	if response_info.Min_interval != 0 {
 		sendTrackerRequestTicker = time.NewTicker(time.Duration(response_info.Min_interval) * time.Second)
-	} else if len(localState.PeerList.List) < 30 {
+	} else if len(localState.Peers.List) < 30 {
 		sendTrackerRequestTicker = time.NewTicker(time.Duration(10) * time.Second)
 	} else {
 		sendTrackerRequestTicker = time.NewTicker(time.Duration(int(math.Min(float64(response_info.Interval), 300))) * time.Second)
@@ -367,9 +368,9 @@ func main() {
 					establishCh <- peer
 				}(p)
 			}
-			if response_info.Min_interval != 0 && len(localState.PeerList.List) < 30 {
+			if response_info.Min_interval != 0 && len(localState.Peers.List) < 30 {
 				sendTrackerRequestTicker.Reset(time.Duration(response_info.Min_interval) * time.Second)
-			} else if len(localState.PeerList.List) < 30 {
+			} else if len(localState.Peers.List) < 30 {
 				sendTrackerRequestTicker.Reset(time.Duration(5) * time.Second)
 			} else {
 				sendTrackerRequestTicker.Reset(time.Duration(int(math.Min(float64(response_info.Interval), 300))) * time.Second)
@@ -381,13 +382,13 @@ func main() {
 
 func OptimisticUnchoking(localState *state.State) {
 	//fmt.Println(localState)
-	if len(localState.Top4) == 4 && len(localState.PeerList.List) > 4 {
+	if len(localState.Top4) == 4 && len(localState.Peers.List) > 4 {
 		SortPeersAndUpdateTop4(localState)
 
 		// Check for any unchoked peers and choke them. Also generate a list of interested peers
 		var interested_peers []*peer.Peer
-		for i := range localState.PeerList.List {
-			p := &localState.PeerList.List[i]
+		for i := range localState.Peers.List {
+			p := &localState.Peers.List[i]
 			if !contains(localState.Top4, p) {
 				if !p.Am_choking {
 					p.UpdateChoking(true)
@@ -413,28 +414,28 @@ func OptimisticUnchoking(localState *state.State) {
 // sort the peers based on upload speed and update the top 4
 func SortPeersAndUpdateTop4(localState *state.State) {
 	// Sort the peers in descending order of upload speed. Latest unchoked peer may be a replacement
-	sort.SliceStable(localState.PeerList.List, func(i, j int) bool {
-		return (localState.PeerList.List)[i].Upload_speed > (localState.PeerList.List)[j].Upload_speed
+	sort.SliceStable(localState.Peers.List, func(i, j int) bool {
+		return (localState.Peers.List)[i].Upload_speed > (localState.Peers.List)[j].Upload_speed
 	})
 
 	// Update the top 4. Top4 stores pointers to Peer
 	localState.Top4 = []*peer.Peer{}
-	for i := 0; i < len(localState.PeerList.List); i++ {
+	for i := 0; i < len(localState.Peers.List); i++ {
 		if len(localState.Top4) == 4 {
 			break
 		}
-		localState.PeerList.List[i].Peer_interested_lock.RLock()
-		if localState.PeerList.List[i].Peer_interested {
-			localState.PeerList.List[i].Am_choking_lock.Lock()
-			if(localState.PeerList.List[i].Am_choking) {
-				localState.PeerList.List[i].Am_choking = false;
-				localState.PeerList.List[i].Connection.SendUnchoke()
+		localState.Peers.List[i].Peer_interested_lock.RLock()
+		if localState.Peers.List[i].Peer_interested {
+			localState.Peers.List[i].Am_choking_lock.Lock()
+			if(localState.Peers.List[i].Am_choking) {
+				localState.Peers.List[i].Am_choking = false;
+				localState.Peers.List[i].Connection.SendUnchoke()
 			}
-			localState.PeerList.List[i].Am_choking_lock.Unlock()
+			localState.Peers.List[i].Am_choking_lock.Unlock()
 
-			localState.Top4 = append(localState.Top4, &localState.PeerList.List[i])
+			localState.Top4 = append(localState.Top4, &localState.Peers.List[i])
 		}
-		localState.PeerList.List[i].Peer_interested_lock.RUnlock()
+		localState.Peers.List[i].Peer_interested_lock.RUnlock()
 	}
 }
 
@@ -450,7 +451,7 @@ func contains(top_four []*peer.Peer, p *peer.Peer) bool {
 
 func CalculateUploadRate(localState *state.State) {
 	var wg sync.WaitGroup
-	for i := range localState.PeerList.List {
+	for i := range localState.Peers.List {
 		wg.Add(1)
 		go func(p *peer.Peer) {
 			defer wg.Done()
@@ -464,7 +465,7 @@ func CalculateUploadRate(localState *state.State) {
 			upload_speed := float64(p.Uploaded_bytes) / float64(time_elapsed)
 			p.Upload_speed = upload_speed
 			p.Uploaded_bytes = 0
-		}(&localState.PeerList.List[i])
+		}(&localState.Peers.List[i])
 	}
 	wg.Wait()
 }
@@ -503,8 +504,8 @@ func weightedRandomChoice(interested_peers []*peer.Peer) int {
 
 func SendKeepAlive(s *state.State) {
 	s.PeersLock.RLock()
-	for i := range s.PeerList.List {
-		s.PeerList.List[i].Connection.SendKeepAlive()
+	for i := range s.Peers.List {
+		s.Peers.List[i].Connection.SendKeepAlive()
 	}
 	s.PeersLock.RUnlock()
 }

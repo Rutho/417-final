@@ -22,10 +22,9 @@ type State struct {
 	//   IP      : IP address of the local machine
 	//   Port    : port that this client will run on
 	//   ID      : unique 20-byte string identifier for use in tracker requests and peer handshakes.
-	//   Peers   : all the peers known to the local client (excluding self)
+	//   Peers : all the peers known to the local client (excluding self)
 	//   Top4    : pointers to the top4 peers
 	//   Bitmap  : represents which pieces of the file being downloaded have been received
-	//   BitmapLock : TODO
 	//   RequestQueue : queue storing pending outgoing requests
 	//   InfoHash     : 20-byte SHA1 hash of the info key in the torrent metainfo file. This is the same info_hash that is transmitted in tracker requests.
 
@@ -34,7 +33,7 @@ type State struct {
 	Port         int
 	ID           string
 	PeersLock    sync.RWMutex
-	PeerList     peer.PeerList
+	Peers     peer.Peers
 	Top4Lock     sync.RWMutex
 	Top4         []*peer.Peer
 	BitmapLock   sync.RWMutex
@@ -74,8 +73,8 @@ func (s State) String() string {
 	output += fmt.Sprintf(" |  FileSize    : %d\n", s.FileSize)
 	output += fmt.Sprintf(" |  NumPieces   : %d\n", s.NumPieces)
 
-	output += " |  PeerList    : ["
-	for i, peer := range s.PeerList.List {
+	output += " |  Peers       : ["
+	for i, peer := range s.Peers.List {
 		if i == 0 {
 			output += fmt.Sprintf("%s", peer)
 		} else {
@@ -167,43 +166,43 @@ func (s *State) GenerateID() string {
 func (s *State) FindPeer(peer_id string) *peer.Peer {
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()
-	return s.PeerList.FindPeerByID(peer_id)
+	return s.Peers.FindPeerByID(peer_id)
 }
 
 func (s *State) FindPeerByAddr(peerAddress net.IP, port int) *peer.Peer {
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()
-	return s.PeerList.FindPeerByAddr(peerAddress, port)
+	return s.Peers.FindPeerByAddr(peerAddress, port)
 }
 
 func (s *State) PeerInterested() []peer.Peer {
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()
-	return s.PeerList.PeerInterested()
+	return s.Peers.PeerInterested()
 }
 
 func (s *State) PeerChoking() []peer.Peer {
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()
-	return s.PeerList.PeerChoking()
+	return s.Peers.PeerChoking()
 }
 
 func (s *State) AmInterested() []peer.Peer {
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()
-	return s.PeerList.AmInterested()
+	return s.Peers.AmInterested()
 }
 
 func (s *State) AmChoking() []peer.Peer {
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()
-	return s.PeerList.AmChoking()
+	return s.Peers.AmChoking()
 }
 
 func (s *State) RemovePeer(peer_id string) {
 	s.PeersLock.Lock()
 	defer s.PeersLock.Unlock()
-	s.PeerList.RemovePeerByID(peer_id)
+	s.Peers.RemovePeerByID(peer_id)
 }
 
 func (s *State) SendARequest() {
@@ -228,7 +227,7 @@ func (s *State) SendARequest() {
 		return
 	}
 
-	peer := request.SelectPeer(&s.PeerList)
+	peer := request.SelectPeer(&s.Peers)
 
 	if peer == nil {
 		return

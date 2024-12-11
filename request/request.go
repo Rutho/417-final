@@ -72,7 +72,7 @@ func SelectPiece(p *peer.Peer, self *bitmap.Bitmap) int {
 	return intersection[rand.Intn(len(intersection))]
 }
 
-func SelectPeer(pl *peer.PeerList) *peer.Peer {
+func SelectPeer(pl *peer.Peers) *peer.Peer {
 	// Description:
 	//
 	//   function to select a peer to send a request to
