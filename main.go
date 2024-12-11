@@ -66,9 +66,9 @@ func main() {
 
 	// Initialize the bitmap
 	localState.PieceLength = torrent_file.Info["piece length"].(int64)
-	localState.FileSize  = torrent_file.Info["length"].(int64)
+	localState.FileSize = torrent_file.Info["length"].(int64)
 	localState.PieceHashes = []byte(torrent_file.Info["pieces"].(string))
-	localState.NumPieces   = len(localState.PieceHashes) / 20
+	localState.NumPieces = len(localState.PieceHashes) / 20
 	localState.Bitmap.New(localState.PieceHashes, localState.PieceLength, localState.FileSize)
 
 	pieceLength := torrent_file.Info["piece length"].(int64)
@@ -80,7 +80,6 @@ func main() {
 
 	// Store the Info_hash
 	localState.Info_hash = request_info.Info_hash
-
 
 	// Store the peer list into the State struct
 	// --------
@@ -295,6 +294,14 @@ func main() {
 		}(p)
 	}
 
+	// Separate goroutine to send requests for pieces
+	requestTicker := time.NewTicker(1 * time.Second)
+	go func() {
+		for range requestTicker.C {
+			localState.SendARequest()
+		}
+	}()
+
 	time.Sleep(20000000000)
 
 	fmt.Println(localState)
@@ -381,7 +388,7 @@ func main() {
 }
 
 func OptimisticUnchoking(localState *state.State) {
-	//fmt.Println(localState)
+	fmt.Println(localState)
 	if len(localState.Top4) == 4 && len(localState.Peers.List) > 4 {
 		SortPeersAndUpdateTop4(localState)
 
@@ -427,8 +434,8 @@ func SortPeersAndUpdateTop4(localState *state.State) {
 		localState.Peers.List[i].Peer_interested_lock.RLock()
 		if localState.Peers.List[i].Peer_interested {
 			localState.Peers.List[i].Am_choking_lock.Lock()
-			if(localState.Peers.List[i].Am_choking) {
-				localState.Peers.List[i].Am_choking = false;
+			if localState.Peers.List[i].Am_choking {
+				localState.Peers.List[i].Am_choking = false
 				localState.Peers.List[i].Connection.SendUnchoke()
 			}
 			localState.Peers.List[i].Am_choking_lock.Unlock()
