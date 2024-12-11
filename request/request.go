@@ -22,7 +22,7 @@ type Request struct {
 	//   Cancelled : if this request is cancelled. Initially false
 
 	Block      bitmap.Block
-	Peer      *peer.Peer
+	Peer       *peer.Peer
 	Cancelled  bool
 }
 
@@ -41,7 +41,7 @@ func SelectPiece(p *peer.Peer, self *bitmap.Bitmap) int {
 	//
 	// Example usage:
 	//
-	//   TODO
+	//   piece_index := request.SelectPiece(peer, &localState.Bitmap)
 
 	if p.Am_interested == false {
 		panic("state.go: SelectPiece() should only be called on peers that the local client is interested in!")
@@ -50,8 +50,8 @@ func SelectPiece(p *peer.Peer, self *bitmap.Bitmap) int {
 	// Get the pieces that the peer has
 	their_bitmap := p.Bitmap.Complete()
 
-	// Get the pieces that the local client is missing
-	my_bitmap    := self.Incomplete()
+	// Get the pieces that the local client needs
+	my_bitmap    := self.PendingIncomplete()
 
 	// Get the intersection of each list
 	var intersection []int
@@ -87,7 +87,7 @@ func SelectPeer(pl *peer.Peers) *peer.Peer {
 	//
 	// Example usage:
 	//
-	//   TODO
+	//   peer := request.SelectPeer(&localState.Peers)
 
 	interested_peers := pl.PeerInterested()
 

@@ -288,12 +288,12 @@ func (conn *ConnectionState) SendPiece(pieceIdx uint32, start_offset uint32, blo
 	conn.sendMessage(pieceMsg)
 }
 
-func (conn *ConnectionState) SendRequest(pieceIdx uint32, start_offset uint32, n int) {
+func (conn *ConnectionState) SendRequest(pieceIdx uint32, start_offset uint32, n uint32) {
 	var requestMsg Message
 	requestMsg.MsgLength = 13
 	requestMsg.MsgType = 6
 	requestMsg.Payload = make([]byte, 4)
-	binary.BigEndian.PutUint32(requestMsg.Payload, uint32(n))
+	binary.BigEndian.PutUint32(requestMsg.Payload, n)
 	conn.sendMessage(requestMsg)
 }
 

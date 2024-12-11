@@ -28,12 +28,11 @@ type Piece struct {
 	// Fields:
 	//
 	//   Index      : index of this piece
-	//   Length     : how many bytes in this piece
+	//   Length     : size of this piece, in bytes
 	//   Hash       : hash of this piece
-	//   Blocks     : slice of blocks. Blocks may overlap (?)
-	//   Progress   : how many bytes downloaded
-	//   Complete   :
-	//   Incomplete :
+	//   Blocks     : slice of blocks representing this piece. Blocks may overlap (?)
+	//   Progress   : how many bytes are currently downloaded
+	//   Pending    : how many bytes are downloaded, assuming in-flight requests succeed
 	//   FileOffset : how many bytes into the file this piece is
 
 	Index      int
@@ -41,9 +40,10 @@ type Piece struct {
 	Hash       []byte
 	Blocks     []Block
 	Progress   int64
-	Complete   bool
-	Incomplete bool
+	Pending    int64
 	FileOffset int64
+
+	Piece_lock *sync.RWMutex
 }
 
 type Block struct {
@@ -58,11 +58,11 @@ type Block struct {
 	//   PieceIndex : the index of the piece that this block belongs to
 	//   Offset     : the byte offset into the piece
 	//   Length     : number of bytes this block is
-	//   Complete   :
-	//   Incomplete :
+	//   Complete   : whether the block is received
+	//   Incomplete : whether the block is received
 
 	PieceIndex int
-	Offset     int
+	Offset     int64
 	Length     int64
 	Complete   bool
 	Incomplete bool
@@ -161,9 +161,8 @@ func (b *Bitmap) New(hashes []byte, piece_len int64, file_len int64) {
 		p.Index      = idx
 		p.Length     = min
 		p.Hash       = hashes[hash_offset:hash_offset+20]
-		p.Complete   = false
-		p.Incomplete = true
 		p.FileOffset = file_offset
+		p.Piece_lock = new(sync.RWMutex)
 
 		// Add the piece to the bitmap
 		b.Pieces = append(b.Pieces, *p)
@@ -200,7 +199,7 @@ func (b *Bitmap) HasPiece(piece_index int) bool {
 	b.Pieces_lock.Lock()
 	defer b.Pieces_lock.Unlock()
 
-	return b.Pieces[piece_index].Complete
+	return b.Pieces[piece_index].Complete()
 }
 
 func (b *Bitmap) MarkPiece(piece_index int) {
@@ -226,76 +225,7 @@ func (b *Bitmap) MarkPiece(piece_index int) {
 	b.Pieces_lock.Lock()
 	defer b.Pieces_lock.Unlock()
 
-	b.Pieces[piece_index].Complete = true
-	b.Pieces[piece_index].Incomplete = false
-}
-
-func (b *Bitmap) Complete() []Piece {
-	// Description:
-	//
-	//   method on the Bitmap struct that returns which pieces
-	//   are fully downloaded
-	//
-	// Parameters:
-	//
-	//   none
-	//
-	// Returns:
-	//
-	//   a list of piece indices that are fully downloaded
-	//
-	// Example usage:
-	//
-	//   var localState State
-	//   fmt.Println("I need:")
-	//   for _, idx := range localState.Bitmap.Complete() {
-	//       fmt.Println(idx)
-	//  }
-
-	b.Pieces_lock.RLock()
-	defer b.Pieces_lock.RUnlock()
-
-	var output []Piece
-	for i := 0; i < len(b.Pieces); i++ {
-		if b.Pieces[i].Incomplete {
-			output = append(output, b.Pieces[i])
-		}
-	}
-	return output
-}
-
-func (b *Bitmap) Incomplete() []Piece {
-	// Description:
-	//
-	//   method on the Bitmap struct that returns which pieces
-	//   are not yet fully downloaded
-	//
-	// Parameters:
-	//
-	//   none
-	//
-	// Returns:
-	//
-	//   a list of piece indices that are not yet fully downloaded
-	//
-	// Example usage:
-	//
-	//   var localState State
-	//   fmt.Println("I need:")
-	//   for _, idx := range localState.Bitmap.Incomplete() {
-	//       fmt.Println(idx)
-	//  }
-
-	b.Pieces_lock.RLock()
-	defer b.Pieces_lock.RUnlock()
-
-	var output []Piece
-	for i := 0; i < len(b.Pieces); i++ {
-		if b.Pieces[i].Incomplete {
-			output = append(output, b.Pieces[i])
-		}
-	}
-	return output
+	b.Pieces[piece_index].Progress = b.Pieces[piece_index].Length
 }
 
 func (b *Bitmap) AllDownloaded() bool {
@@ -322,7 +252,7 @@ func (b *Bitmap) AllDownloaded() bool {
 	defer b.Pieces_lock.RUnlock()
 
 	for i := 0; i < len(b.Pieces); i++ {
-		if b.Pieces[i].Incomplete {
+		if b.Pieces[i].Incomplete() {
 			return false
 		}
 	}
@@ -353,7 +283,7 @@ func (b *Bitmap) Bitmap() []bool {
 
 	var output []bool
 	for i := 0; i < len(b.Pieces); i++ {
-		if b.Pieces[i].Complete {
+		if b.Pieces[i].Complete() {
 			output = append(output, true)
 		} else {
 			output = append(output, false)
@@ -421,3 +351,99 @@ func (b *Bitmap) HasExtraPieces(b2 *Bitmap) (bool, error) {
 	return false, nil
 }
 
+
+func (b *Bitmap) Complete() []Piece {
+	// Description:
+	//    Returns a list of Pieces that are 100% downloaded
+	b.Pieces_lock.RLock()
+	defer b.Pieces_lock.RUnlock()
+
+	var output []Piece
+	for i := 0; i < len(b.Pieces); i++ {
+		if b.Pieces[i].Complete() {
+			output = append(output, b.Pieces[i])
+		}
+	}
+	return output
+}
+
+func (b *Bitmap) Incomplete() []Piece {
+	// Description:
+	//    Returns a list of Pieces that are not 100% downloaded
+	b.Pieces_lock.RLock()
+	defer b.Pieces_lock.RUnlock()
+
+	var output []Piece
+	for i := 0; i < len(b.Pieces); i++ {
+		if b.Pieces[i].Incomplete() {
+			output = append(output, b.Pieces[i])
+		}
+	}
+	return output
+}
+
+func (b *Bitmap) PendingComplete() []Piece {
+	// Description:
+	//    Returns a list of Pieces that will be 100% downloaded,
+	//    after all pending requests are completed
+	b.Pieces_lock.RLock()
+	defer b.Pieces_lock.RUnlock()
+
+	var output []Piece
+	for i := 0; i < len(b.Pieces); i++ {
+		if b.Pieces[i].PendingComplete() {
+			output = append(output, b.Pieces[i])
+		}
+	}
+	return output
+}
+
+func (b *Bitmap) PendingIncomplete() []Piece {
+	// Description:
+	//    Returns a list of Pieces that will not be 100% downloaded,
+	//    even after all pending requests are completed
+	b.Pieces_lock.RLock()
+	defer b.Pieces_lock.RUnlock()
+
+	var output []Piece
+	for i := 0; i < len(b.Pieces); i++ {
+		if b.Pieces[i].PendingIncomplete() {
+			output = append(output, b.Pieces[i])
+		}
+	}
+	return output
+}
+
+func (p *Piece) Complete() bool {
+	// Returns true if:
+	//   the piece is 100% downloaded
+	p.Piece_lock.RLock()
+	defer p.Piece_lock.RUnlock()
+	return p.Progress >= p.Length
+}
+
+func (p *Piece) Incomplete() bool {
+	// Returns true if:
+	//   the piece is not 100% downloaded
+	p.Piece_lock.RLock()
+	defer p.Piece_lock.RUnlock()
+	return p.Progress < p.Length
+}
+
+func (p *Piece) PendingComplete() bool {
+	// Returns true if:
+	//   the piece will be 100% downloaded,
+	//   after all pending requests are completed
+	p.Piece_lock.RLock()
+	defer p.Piece_lock.RUnlock()
+	return p.Pending >= p.Length
+}
+
+func (p *Piece) PendingIncomplete() bool {
+	// Returns true if:
+	//   the piece will not be 100% downloaded,
+	//   even after all pending requests are completed
+	p.Piece_lock.RLock()
+	defer p.Piece_lock.RUnlock()
+	return p.Pending < p.Length
+}

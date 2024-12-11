@@ -172,7 +172,7 @@ func main() {
 				peer.Bitmap_lock.Lock()
 				peer.Bitmap.MarkPiece(int(piece_index))
 				peer.Bitmap_lock.Unlock()
-				if !localState.Bitmap.HasPiece(int(piece_index)) && !peer.Am_interested {
+				if !localState.Bitmap.Pieces[int(piece_index)].Complete() && !peer.Am_interested {
 					peer.UpdateInterested(true)
 					peer.Connection.SendInterested()
 				}
@@ -194,7 +194,7 @@ func main() {
 					//Latter case only happens if we're sending multiple requests for the same block to different peers
 					//Should we include these messages for the calculation of peer's upload rate then?
 					p := localState.FindPeer(msg.PeerId)
-					if !localState.Bitmap.HasPiece(int(pieceIdx)) {
+					if !localState.Bitmap.Pieces[int(pieceIdx)].Complete() {
 						buf := msg.Payload[8:]
 						p.Uploaded_bytes += int64(len(buf))
 
@@ -230,7 +230,7 @@ func main() {
 					}
 				case comms.Request:
 					peer := localState.FindPeer(msg.PeerId)
-					if !localState.Bitmap.HasPiece(pieceIdx) || peer.Am_choking {
+					if !localState.Bitmap.Pieces[int(pieceIdx)].Complete() || peer.Am_choking {
 						return
 					}
 					length := binary.BigEndian.Uint32(msg.Payload[8:12])

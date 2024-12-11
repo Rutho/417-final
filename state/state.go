@@ -26,6 +26,7 @@ type State struct {
 	//   Top4    : pointers to the top4 peers
 	//   Bitmap  : represents which pieces of the file being downloaded have been received
 	//   RequestQueue : queue storing pending outgoing requests
+	//   FileSize     : file size in bytes, assuming single file mode
 	//   InfoHash     : 20-byte SHA1 hash of the info key in the torrent metainfo file. This is the same info_hash that is transmitted in tracker requests.
 
 	TorrentFile  string
@@ -33,7 +34,7 @@ type State struct {
 	Port         int
 	ID           string
 	PeersLock    sync.RWMutex
-	Peers     peer.Peers
+	Peers        peer.Peers
 	Top4Lock     sync.RWMutex
 	Top4         []*peer.Peer
 	BitmapLock   sync.RWMutex
@@ -233,10 +234,32 @@ func (s *State) SendARequest() {
 		return
 	}
 
-	// piece_index := s.SelectPiece(peer)
+	piece_index := request.SelectPiece(peer, &s.Bitmap)
 
+	// The last block may be smaller in size
+	var min int64
+	if request.MaxBlockSize < s.Bitmap.Pieces[piece_index].Length - s.Bitmap.Pieces[piece_index].Pending {
+		min = request.MaxBlockSize
+	} else {
+		min = s.Bitmap.Pieces[piece_index].Length - s.Bitmap.Pieces[piece_index].Pending
+	}
 
-	// TODO
-	// peer.Connection.SendRequest(idx, offset, length)
+	b := new(bitmap.Block)
+	b.PieceIndex = piece_index
+	b.Offset     = s.Bitmap.Pieces[piece_index].Pending
+	b.Length     = min
+	b.Complete   = false
+	b.Incomplete = true
+
+	s.Bitmap.Pieces[piece_index].Pending += b.Length
+
+	r := new(request.Request)
+	r.Block     = *b
+	r.Peer      = peer
+	r.Cancelled = false
+
+	s.RequestQueue = append(RequestQueue, r)
+
+	peer.Connection.SendRequest(uint32(piece_index), uint32(b.Offset), uint32(b.Length))
 }
 
