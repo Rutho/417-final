@@ -30,7 +30,7 @@ type Piece struct {
 	//   Index      : index of this piece
 	//   Length     : how many bytes in this piece
 	//   Hash       : hash of this piece
-	//   Blocks     : slice of blocks
+	//   Blocks     : slice of blocks. Blocks may overlap (?)
 	//   Progress   : how many bytes downloaded
 	//   Complete   :
 	//   Incomplete :
@@ -55,12 +55,17 @@ type Block struct {
 	//
 	// Fields:
 	//
+	//   PieceIndex : the index of the piece that this block belongs to
 	//   Offset     : the byte offset into the piece
 	//   Length     : number of bytes this block is
+	//   Complete   :
+	//   Incomplete :
 
 	PieceIndex int
 	Offset     int
 	Length     int64
+	Complete   bool
+	Incomplete bool
 }
 
 func (b Bitmap) String() string {
@@ -225,10 +230,11 @@ func (b *Bitmap) MarkPiece(piece_index int) {
 	b.Pieces[piece_index].Incomplete = false
 }
 
-func (b *Bitmap) MissingPieces() []Piece {
+func (b *Bitmap) Complete() []Piece {
 	// Description:
 	//
-	//   method on the Bitmap struct that returns which pieces are not yet downloaded
+	//   method on the Bitmap struct that returns which pieces
+	//   are fully downloaded
 	//
 	// Parameters:
 	//
@@ -236,14 +242,48 @@ func (b *Bitmap) MissingPieces() []Piece {
 	//
 	// Returns:
 	//
-	//   a list of piece indices that are not yet downloaded
+	//   a list of piece indices that are fully downloaded
 	//
 	// Example usage:
 	//
 	//   var localState State
 	//   fmt.Println("I need:")
-	//   for _, piece := range localState.Bitmap.MissingPieces() {
-	//       fmt.Println(piece)
+	//   for _, idx := range localState.Bitmap.Complete() {
+	//       fmt.Println(idx)
+	//  }
+
+	b.Pieces_lock.RLock()
+	defer b.Pieces_lock.RUnlock()
+
+	var output []Piece
+	for i := 0; i < len(b.Pieces); i++ {
+		if b.Pieces[i].Incomplete {
+			output = append(output, b.Pieces[i])
+		}
+	}
+	return output
+}
+
+func (b *Bitmap) Incomplete() []Piece {
+	// Description:
+	//
+	//   method on the Bitmap struct that returns which pieces
+	//   are not yet fully downloaded
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   a list of piece indices that are not yet fully downloaded
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   fmt.Println("I need:")
+	//   for _, idx := range localState.Bitmap.Incomplete() {
+	//       fmt.Println(idx)
 	//  }
 
 	b.Pieces_lock.RLock()

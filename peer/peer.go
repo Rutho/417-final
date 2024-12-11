@@ -6,7 +6,20 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"strings"
 )
+
+type PeerList struct {
+	// Description:
+	//
+	//   structure that stores a list of peers
+	//
+	// Fields:
+	//
+	//   List : list of peers
+
+	List []Peer
+}
 
 type Peer struct {
 	// Description:
@@ -69,6 +82,196 @@ func (p Peer) String() string {
 	return fmt.Sprintf("%s:%d", p.Ip.String(), p.Port)
 }
 
+
+
+func (pl *PeerList) FindPeerByID(peer_id string) *Peer {
+	// Description:
+	//
+	//   method on the PeerList struct to find a peer by ID
+	//
+	// Parameters:
+	//
+	//   a string of length 20 chars, representing the peer ID
+	//
+	// Returns:
+	//
+	//   a pointer to the peer with the specified ID, or nil if not found
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   peer := localState.PeerList.FindPeerByID("-RFRA00-WZW3JVR4dIv3")
+	//   fmt.Println(peer)
+
+	for i := range pl.List {
+		if pl.List[i].Peer_id == peer_id {
+			return & pl.List[i]
+		}
+	}
+	return nil
+}
+
+func (pl *PeerList) FindPeerByAddr(peer_address net.IP, port int) *Peer {
+	// Description:
+	//
+	//   method on the PeerList struct to find a peer by IP address and port
+	//
+	// Parameters:
+	//
+	//   a string of length 20 chars, representing the peer ID
+	//
+	// Returns:
+	//
+	//   a pointer to the peer with the matching addr and port, or nil if not found
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   peer := localState.PeerList.FindPeerByID("-RFRA00-WZW3JVR4dIv3")
+	//   fmt.Println(peer)
+
+	for i := range pl.List {
+		if strings.Compare(pl.List[i].Ip.String(), peer_address.String()) == 0 && pl.List[i].Port == port {
+			return &pl.List[i]
+		}
+	}
+	return nil
+}
+
+func (pl *PeerList) PeerInterested() []Peer {
+	// Description:
+	//
+	//   method on the PeerList struct to get all the interested peers
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   a slice of peers who are interested in the local client
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   for _, peer := localState.PeerList.PeerInterested() {
+	//       process(peer)
+	//   }
+
+	var output []Peer
+	for i := range pl.List {
+		if pl.List[i].Peer_interested == true {
+			output = append(output, pl.List[i])
+		}
+	}
+	return output
+}
+
+func (pl *PeerList) PeerChoking() []Peer {
+	// Description:
+	//
+	//   method on the PeerList struct to get all the peers who are choking us
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   a slice of peers who are choking the local client
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   for _, peer := localState.PeerChoking() {
+	//       process(peer)
+	//   }
+
+	var output []Peer
+	for i := range pl.List {
+		if pl.List[i].Peer_choking == true {
+			output = append(output, pl.List[i])
+		}
+	}
+	return output
+}
+
+func (pl *PeerList) AmInterested() []Peer {
+	// Description:
+	//
+	//   method on the PeerList struct to get all the peers who we are interested in
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   a slice of peers who the local client is interested in
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   for _, peer := localState.AmInterested() {
+	//       process(peer)
+	//   }
+
+	var output []Peer
+	for i := range pl.List {
+		if pl.List[i].Am_interested == true {
+			output = append(output, pl.List[i])
+		}
+	}
+	return output
+}
+
+func (pl *PeerList) AmChoking() []Peer {
+	// Description:
+	//
+	//   method on the PeerList struct to get all the peers who we are choking
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   a slice of peers who the local client is choking
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   for _, peer := localState.AmChoking() {
+	//       process(peer)
+	//   }
+
+	var output []Peer
+	for i := range pl.List {
+		if pl.List[i].Am_interested == true {
+			output = append(output, pl.List[i])
+		}
+	}
+	return output
+}
+
+func (pl *PeerList) RemovePeerByID(peer_id string) {
+	idx := 0
+	for p_idx, p := range pl.List {
+		if strings.Compare(p.Peer_id, peer_id) == 0 {
+			idx = p_idx
+		}
+	}
+	fmt.Println(idx, len(pl.List))
+	if idx == 0 {
+		return
+	}
+	if idx == (len(pl.List)) {
+		pl.List = pl.List[:len(pl.List)]
+		return
+	}
+	pl.List = append(pl.List[:idx], pl.List[idx+1:]...)
+}
+
 // Mutex updates
 func (p *Peer) UpdateChoking(c bool) {
 	p.Am_choking_lock.Lock()
@@ -93,3 +296,6 @@ func (p *Peer) UpdatePeerInterested(c bool) {
 	defer p.Peer_interested_lock.Unlock()
 	p.Peer_interested = c
 }
+
+
+

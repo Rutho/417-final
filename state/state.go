@@ -8,7 +8,6 @@ import (
 	"fmt"  // https://pkg.go.dev/fmt
 	"math/rand"
 	"net"
-	"strings"
 	"sync"
 )
 
@@ -37,6 +36,7 @@ type State struct {
 	PeersLock    sync.RWMutex
 	Top4Lock     sync.RWMutex
 	Peers        []peer.Peer
+	PeerList     peer.PeerList
 	Top4         []*peer.Peer
 	BitmapLock   sync.RWMutex
 	Bitmap       bitmap.Bitmap
@@ -74,8 +74,8 @@ func (s State) String() string {
 	output += fmt.Sprintf(" |  FileSize    : %d\n", s.FileSize)
 	output += fmt.Sprintf(" |  NumPieces   : %d\n", s.NumPieces)
 
-	output += " |  Peers       : ["
-	for i, peer := range s.Peers {
+	output += " |  PeerList    : ["
+	for i, peer := range s.PeerList.List {
 		if i == 0 {
 			output += fmt.Sprintf("%s", peer)
 		} else {
@@ -217,13 +217,7 @@ func (s *State) FindPeerByAddr(peerAddress net.IP, port int) *peer.Peer {
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()
 
-	for i := range s.Peers {
-		if strings.Compare(s.Peers[i].Ip.String(), peerAddress.String()) == 0 &&
-			s.Peers[i].Port == port {
-			return &s.Peers[i]
-		}
-	}
-	return nil
+	return s.PeerList.FindPeerByAddr(peerAddress, port)
 }
 
 func (s *State) PeerInterested() []peer.Peer {
@@ -249,13 +243,7 @@ func (s *State) PeerInterested() []peer.Peer {
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()
 
-	var output []peer.Peer
-	for i := range s.Peers {
-		if s.Peers[i].Peer_interested == true {
-			output = append(output, s.Peers[i])
-		}
-	}
-	return output
+	return s.PeerList.PeerInterested()
 }
 
 func (s *State) PeerChoking() []peer.Peer {
@@ -281,13 +269,7 @@ func (s *State) PeerChoking() []peer.Peer {
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()
 
-	var output []peer.Peer
-	for i := range s.Peers {
-		if s.Peers[i].Peer_choking == true {
-			output = append(output, s.Peers[i])
-		}
-	}
-	return output
+	return s.PeerList.PeerChoking()
 }
 
 func (s *State) AmInterested() []peer.Peer {
@@ -313,13 +295,7 @@ func (s *State) AmInterested() []peer.Peer {
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()
 
-	var output []peer.Peer
-	for i := range s.Peers {
-		if s.Peers[i].Am_interested == true {
-			output = append(output, s.Peers[i])
-		}
-	}
-	return output
+	return s.PeerList.AmInterested()
 }
 
 func (s *State) AmChoking() []peer.Peer {
@@ -345,52 +321,21 @@ func (s *State) AmChoking() []peer.Peer {
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()
 
-	var output []peer.Peer
-	for i := range s.Peers {
-		if s.Peers[i].Am_interested == true {
-			output = append(output, s.Peers[i])
-		}
-	}
-	return output
+	return s.PeerList.AmChoking()
 }
 
-func (s *State) SetAmInterested() {
-	for p_idx := range s.Peers {
-		a := s.Bitmap.Bitmap()
-		b := s.Peers[p_idx].Bitmap.Bitmap()
-
-		for i := range a {
-			if a[i] == false && b[i] == true {
-				s.Peers[p_idx].Am_interested = true
-			}
-		}
-	}
-}
-
-func (s *State) RemovePeer(PeerId string) {
-	idx := 0
+func (s *State) RemovePeer(peer_id string) {
 	s.PeersLock.Lock()
 	defer s.PeersLock.Unlock()
-	for p_idx, p := range s.Peers {
-		if strings.Compare(p.Peer_id, PeerId) == 0 {
-			idx = p_idx
-		}
-	}
-	fmt.Println(idx, len(s.Peers))
-	if idx == 0 {
-		return
-	}
-	if idx == (len(s.Peers)) {
-		s.Peers = s.Peers[:len(s.Peers)]
-		return
-	}
-	s.Peers = append(s.Peers[:idx], s.Peers[idx+1:]...)
+
+	s.PeerList.RemovePeerByID(peer_id)
 }
 
 func (s *State) SendARequest() {
 	// Description:
 	//
-	//   method on the State struct to send a request to a peer for a piece
+	//   method on the State struct to send a request to a peer for a piece.
+	//   Is not guaranteed to send a request.
 	//
 	// Parameters:
 	//
@@ -410,8 +355,57 @@ func (s *State) SendARequest() {
 		return
 	}
 
+	// piece_index := s.SelectPiece(peer)
+
+
 	// TODO
 	// peer.Connection.SendRequest(idx, offset, length)
+}
+
+func (s *State) SelectPiece(p *peer.Peer) int {
+	// Description:
+	//
+	//   method on the State struct to select a piece to be requested from a peer
+	//
+	// Parameters:
+	//
+	//   a peer
+	//
+	// Returns:
+	//
+	//   a piece index
+	//
+	// Example usage:
+	//
+	//   TODO
+
+	if p.Am_interested == false {
+		panic("state.go: SelectPiece() should only be called on peers that the local client is interested in!")
+	}
+
+	// Get the pieces that the peer has
+	their_bitmap := p.Bitmap.Complete()
+
+	// Get the pieces that the local client is missing
+	my_bitmap    := s.Bitmap.Incomplete()
+
+	// Get the intersection of each list
+	var intersection []int
+	for _, piece := range my_bitmap {
+		// Is piece contained in their_bitmap?
+		for i := range their_bitmap {
+			if their_bitmap[i].Index == piece.Index {
+				intersection = append(intersection, piece.Index)
+			}
+		}
+	}
+
+	if len(intersection) == 0 {
+		panic("state.go: SendARequest(): We shouldn't be interested in this peer?!?")
+	}
+
+	// Pick a random piece
+	return intersection[rand.Intn(len(intersection))]
 }
 
 func (s *State) SelectPeer() *peer.Peer {
@@ -429,7 +423,8 @@ func (s *State) SelectPeer() *peer.Peer {
 	//
 	// Example usage:
 	//
-	//   TODO
+	//   var s State
+	//   peer := s.SelectPeer()
 
 	if request.QueueIsFull(s.RequestQueue) {
 		return nil
