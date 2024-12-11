@@ -258,7 +258,7 @@ func (s *State) SendARequest() {
 	r.Peer      = peer
 	r.Cancelled = false
 
-	s.RequestQueue = append(RequestQueue, r)
+	s.RequestQueue = append(s.RequestQueue, *r)
 
 	peer.Connection.SendRequest(uint32(piece_index), uint32(b.Offset), uint32(b.Length))
 }
