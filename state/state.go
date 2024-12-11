@@ -26,17 +26,16 @@ type State struct {
 	//   Top4    : pointers to the top4 peers
 	//   Bitmap  : represents which pieces of the file being downloaded have been received
 	//   BitmapLock : TODO
-	//   Cycle  : control variable for usage in Choke Algorithm
 	//   RequestQueue : queue storing pending outgoing requests
+	//   InfoHash     : 20-byte SHA1 hash of the info key in the torrent metainfo file. This is the same info_hash that is transmitted in tracker requests.
 
 	TorrentFile  string
 	IP           net.IP
 	Port         int
 	ID           string
 	PeersLock    sync.RWMutex
-	Top4Lock     sync.RWMutex
-	Peers        []peer.Peer
 	PeerList     peer.PeerList
+	Top4Lock     sync.RWMutex
 	Top4         []*peer.Peer
 	BitmapLock   sync.RWMutex
 	Bitmap       bitmap.Bitmap
@@ -45,6 +44,7 @@ type State struct {
 	PieceLength  int64
 	FileSize     int64
 	NumPieces    int
+	Info_hash    []byte
 }
 
 func (s State) String() string {
@@ -164,170 +164,45 @@ func (s *State) GenerateID() string {
 	return s.ID
 }
 
-func (s *State) FindPeer(peerId string) *peer.Peer {
-	// Description:
-	//
-	//   method on the State struct to find a peer by ID
-	//
-	// Parameters:
-	//
-	//   a string of length 20 chars, representing the ID
-	//
-	// Returns:
-	//
-	//   a pointer to the peer with the specified ID, or nil if not found
-	//
-	// Example usage:
-	//
-	//   var localState State
-	//   peer := localState.FindPeer("-RFRA00-WZW3JVR4dIv3")
-	//   fmt.Println(peer)
-
+func (s *State) FindPeer(peer_id string) *peer.Peer {
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()
-
-	for i := range s.Peers {
-		if s.Peers[i].Peer_id == peerId {
-			return &s.Peers[i]
-		}
-	}
-	return nil
+	return s.PeerList.FindPeerByID(peer_id)
 }
 
 func (s *State) FindPeerByAddr(peerAddress net.IP, port int) *peer.Peer {
-	// Description:
-	//
-	//   method on the State struct to find a peer by ID
-	//
-	// Parameters:
-	//
-	//   a net.IP representing the peer's ip address
-	//	 an int representing the peer's port
-	//
-	// Returns:
-	//
-	//   a pointer to the peer with the specified ID, or nil if not found
-	//
-	// Example usage:
-	//
-	//   var localState State
-	//   peer := localState.FindPeer("-RFRA00-WZW3JVR4dIv3")
-	//   fmt.Println(peer)
-
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()
-
 	return s.PeerList.FindPeerByAddr(peerAddress, port)
 }
 
 func (s *State) PeerInterested() []peer.Peer {
-	// Description:
-	//
-	//   method on the State struct to get all the interested peers
-	//
-	// Parameters:
-	//
-	//   none
-	//
-	// Returns:
-	//
-	//   a slice of peers who are interested in the local client
-	//
-	// Example usage:
-	//
-	//   var localState State
-	//   for _, peer := localState.PeerInterested() {
-	//       process(peer)
-	//   }
-
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()
-
 	return s.PeerList.PeerInterested()
 }
 
 func (s *State) PeerChoking() []peer.Peer {
-	// Description:
-	//
-	//   method on the State struct to get all the peers who are choking us
-	//
-	// Parameters:
-	//
-	//   none
-	//
-	// Returns:
-	//
-	//   a slice of peers who are choking the local client
-	//
-	// Example usage:
-	//
-	//   var localState State
-	//   for _, peer := localState.PeerChoking() {
-	//       process(peer)
-	//   }
-
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()
-
 	return s.PeerList.PeerChoking()
 }
 
 func (s *State) AmInterested() []peer.Peer {
-	// Description:
-	//
-	//   method on the State struct to get all the peers who we are interested in
-	//
-	// Parameters:
-	//
-	//   none
-	//
-	// Returns:
-	//
-	//   a slice of peers who the local client is interested in
-	//
-	// Example usage:
-	//
-	//   var localState State
-	//   for _, peer := localState.AmInterested() {
-	//       process(peer)
-	//   }
-
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()
-
 	return s.PeerList.AmInterested()
 }
 
 func (s *State) AmChoking() []peer.Peer {
-	// Description:
-	//
-	//   method on the State struct to get all the peers who we are choking
-	//
-	// Parameters:
-	//
-	//   none
-	//
-	// Returns:
-	//
-	//   a slice of peers who the local client is choking
-	//
-	// Example usage:
-	//
-	//   var localState State
-	//   for _, peer := localState.AmChoking() {
-	//       process(peer)
-	//   }
-
 	s.PeersLock.RLock()
 	defer s.PeersLock.RUnlock()
-
 	return s.PeerList.AmChoking()
 }
 
 func (s *State) RemovePeer(peer_id string) {
 	s.PeersLock.Lock()
 	defer s.PeersLock.Unlock()
-
 	s.PeerList.RemovePeerByID(peer_id)
 }
 
@@ -349,7 +224,11 @@ func (s *State) SendARequest() {
 	//
 	//   TODO
 
-	peer := s.SelectPeer()
+	if len(s.RequestQueue) >= request.QueueSize {
+		return
+	}
+
+	peer := request.SelectPeer(&s.PeerList)
 
 	if peer == nil {
 		return
@@ -361,86 +240,4 @@ func (s *State) SendARequest() {
 	// TODO
 	// peer.Connection.SendRequest(idx, offset, length)
 }
-
-func (s *State) SelectPiece(p *peer.Peer) int {
-	// Description:
-	//
-	//   method on the State struct to select a piece to be requested from a peer
-	//
-	// Parameters:
-	//
-	//   a peer
-	//
-	// Returns:
-	//
-	//   a piece index
-	//
-	// Example usage:
-	//
-	//   TODO
-
-	if p.Am_interested == false {
-		panic("state.go: SelectPiece() should only be called on peers that the local client is interested in!")
-	}
-
-	// Get the pieces that the peer has
-	their_bitmap := p.Bitmap.Complete()
-
-	// Get the pieces that the local client is missing
-	my_bitmap    := s.Bitmap.Incomplete()
-
-	// Get the intersection of each list
-	var intersection []int
-	for _, piece := range my_bitmap {
-		// Is piece contained in their_bitmap?
-		for i := range their_bitmap {
-			if their_bitmap[i].Index == piece.Index {
-				intersection = append(intersection, piece.Index)
-			}
-		}
-	}
-
-	if len(intersection) == 0 {
-		panic("state.go: SendARequest(): We shouldn't be interested in this peer?!?")
-	}
-
-	// Pick a random piece
-	return intersection[rand.Intn(len(intersection))]
-}
-
-func (s *State) SelectPeer() *peer.Peer {
-	// Description:
-	//
-	//   method on the State struct to select a peer to send a request to
-	//
-	// Parameters:
-	//
-	//   none
-	//
-	// Returns:
-	//
-	//   a pointer to the peer, or nil upon error
-	//
-	// Example usage:
-	//
-	//   var s State
-	//   peer := s.SelectPeer()
-
-	if request.QueueIsFull(s.RequestQueue) {
-		return nil
-	}
-
-	interested_peers := s.PeerInterested()
-
-	if len(interested_peers) == 0 {
-		return nil
-	}
-
-	// Pick a random peer
-	rand_idx := rand.Intn(len(interested_peers))
-
-	return &interested_peers[rand_idx]
-}
-
-
 

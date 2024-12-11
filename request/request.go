@@ -3,6 +3,7 @@ package request
 import (
 	"client/bitmap"
 	"client/peer"
+	"math/rand"
 )
 
 const MaxBlockSize = 16384 // Maximum block size, in bytes
@@ -25,22 +26,77 @@ type Request struct {
 	Cancelled  bool
 }
 
-func QueueIsFull(rq []Request) bool {
+func SelectPiece(p *peer.Peer, self *bitmap.Bitmap) int {
 	// Description:
 	//
-	//   function to check if the Request Queue is full
+	//   function to select a piece to be requested from a peer
 	//
 	// Parameters:
 	//
-	//   a pointer to the State struct
+	//   a peer and the local client's bitmap
 	//
 	// Returns:
 	//
-	//   true if full, false otherwise
+	//   a piece index
 	//
 	// Example usage:
 	//
 	//   TODO
 
-	return len(rq) >= QueueSize
+	if p.Am_interested == false {
+		panic("state.go: SelectPiece() should only be called on peers that the local client is interested in!")
+	}
+
+	// Get the pieces that the peer has
+	their_bitmap := p.Bitmap.Complete()
+
+	// Get the pieces that the local client is missing
+	my_bitmap    := self.Incomplete()
+
+	// Get the intersection of each list
+	var intersection []int
+	for _, piece := range my_bitmap {
+		// Is piece contained in their_bitmap?
+		for i := range their_bitmap {
+			if their_bitmap[i].Index == piece.Index {
+				intersection = append(intersection, piece.Index)
+			}
+		}
+	}
+
+	if len(intersection) == 0 {
+		panic("state.go: SendARequest(): We shouldn't be interested in this peer?!?")
+	}
+
+	// Pick a random piece
+	return intersection[rand.Intn(len(intersection))]
+}
+
+func SelectPeer(pl *peer.PeerList) *peer.Peer {
+	// Description:
+	//
+	//   function to select a peer to send a request to
+	//
+	// Parameters:
+	//
+	//   a pointer to a Peerlist struct
+	//
+	// Returns:
+	//
+	//   a pointer to the peer, or nil upon error
+	//
+	// Example usage:
+	//
+	//   TODO
+
+	interested_peers := pl.PeerInterested()
+
+	if len(interested_peers) == 0 {
+		return nil
+	}
+
+	// Pick a random peer
+	rand_idx := rand.Intn(len(interested_peers))
+
+	return &interested_peers[rand_idx]
 }
