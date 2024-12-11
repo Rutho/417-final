@@ -5,8 +5,8 @@ import (
 	"client/comms"
 	"fmt"
 	"net"
-	"sync"
 	"strings"
+	"sync"
 )
 
 type Peers struct {
@@ -82,8 +82,6 @@ func (p Peer) String() string {
 	return fmt.Sprintf("%s:%d", p.Ip.String(), p.Port)
 }
 
-
-
 func (pl *Peers) FindPeerByID(peer_id string) *Peer {
 	// Description:
 	//
@@ -105,7 +103,7 @@ func (pl *Peers) FindPeerByID(peer_id string) *Peer {
 
 	for i := range pl.List {
 		if pl.List[i].Peer_id == peer_id {
-			return & pl.List[i]
+			return &pl.List[i]
 		}
 	}
 	return nil
@@ -296,6 +294,3 @@ func (p *Peer) UpdatePeerInterested(c bool) {
 	defer p.Peer_interested_lock.Unlock()
 	p.Peer_interested = c
 }
-
-
-

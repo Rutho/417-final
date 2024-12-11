@@ -247,7 +247,7 @@ func (s *State) SendARequest() bool {
 
 	// The last block may be smaller in size
 	var min int64
-	if request.MaxBlockSize < s.Bitmap.Pieces[piece_index].Length - s.Bitmap.Pieces[piece_index].Pending {
+	if request.MaxBlockSize < s.Bitmap.Pieces[piece_index].Length-s.Bitmap.Pieces[piece_index].Pending {
 		min = request.MaxBlockSize
 	} else {
 		min = s.Bitmap.Pieces[piece_index].Length - s.Bitmap.Pieces[piece_index].Pending
@@ -256,11 +256,11 @@ func (s *State) SendARequest() bool {
 	// Make a new block
 	b := new(bitmap.Block)
 	b.PieceIndex = piece_index
-	b.Offset     = s.Bitmap.Pieces[piece_index].Pending
-	b.Length     = min
+	b.Offset = s.Bitmap.Pieces[piece_index].Pending
+	b.Length = min
 	b.Block_lock = new(sync.RWMutex)
 
-	b.Complete   = false
+	b.Complete = false
 	b.Incomplete = true
 
 	// Increase pending bytes
@@ -268,8 +268,8 @@ func (s *State) SendARequest() bool {
 
 	// Make a new request
 	r := new(request.Request)
-	r.Block     = *b
-	r.Peer      = peer
+	r.Block = *b
+	r.Peer = peer
 	r.Cancelled = false
 	r.Timestamp = time.Now().Unix()
 	r.Request_lock = new(sync.RWMutex)
@@ -282,4 +282,3 @@ func (s *State) SendARequest() bool {
 	fmt.Printf("Sent a request to %s\n", peer)
 	return false
 }
-

@@ -331,9 +331,9 @@ func Send_http(request *Tracker_request, ip string, g_port int, response *Tracke
 		fmt.Println("no min interval")
 	}
 
-	peer_string, ok := ben_data["peers"].(string)
+	peer_string, ok_str := ben_data["peers"].(string)
 
-	if ok {
+	if ok_str {
 
 		for i := 0; i < len(peer_string); i += 6 {
 			cutoff := i + 6
@@ -386,7 +386,6 @@ func Send_http(request *Tracker_request, ip string, g_port int, response *Tracke
 			p_port, ok := v["port"].(int64)
 			if ok {
 				tmp_peer.Port = int(p_port)
-
 			}
 
 			tmp_peer.Am_choking = true
@@ -402,9 +401,9 @@ func Send_http(request *Tracker_request, ip string, g_port int, response *Tracke
 
 			*response.Peers = append(*response.Peers, tmp_peer)
 		}
-
+		print(response.Peers)
 		print(peer_dict)
-	} else {
+	} else if !ok_str && !ok {
 		fmt.Println("NO DATA FROM TRACKER")
 	}
 	return 1

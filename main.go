@@ -15,8 +15,8 @@ import (
 	"client/data"
 	"client/filemanager"
 	"client/peer"
-	"client/state"
 	"client/request"
+	"client/state"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -120,8 +120,7 @@ func main() {
 				//numberOfPieces may not be a multiple of 8, so last byte in Bitfield may have spare bits
 				bitfieldSizeInBits := int(math.Ceil((float64(numberOfpieces) / float64(8)))) * 8
 				if bitfieldSizeInBits != (int(msg.MsgLength-1) * 8) {
-					//fmt.Printf("whatt\n")
-					//TODO: disconnect peer.
+					s.DisconnectCh <- msg.PeerId
 					return
 				}
 				peer.Bitmap_lock.Lock()
@@ -321,6 +320,9 @@ func main() {
 
 	fmt.Println("Hello!!!")
 
+	go func() {
+		localState.SendARequest()
+	}()
 	/*
 		Call Optimistic Unchoking every 30 seconds.
 		Calculate the upload rate of every peer every 10 seconds
@@ -329,16 +331,33 @@ func main() {
 	// Tickers for periodic tasks
 	optimisticUnchokingTicker := time.NewTicker(30 * time.Second)
 	calculateUploadRateTicker := time.NewTicker(10 * time.Second)
-	sendKeepAliveTicker       := time.NewTicker(30 * time.Second)
-	printLocalStateTicker     := time.NewTicker(30 * time.Second)
+	sendKeepAliveTicker := time.NewTicker(30 * time.Second)
+	printLocalStateTicker := time.NewTicker(30 * time.Second)
 	var sendTrackerRequestTicker *time.Ticker
-	if response_info.Min_interval != 0 {
-		sendTrackerRequestTicker = time.NewTicker(time.Duration(response_info.Min_interval) * time.Second)
-	} else if len(localState.Peers.List) < 30 {
+	upcomingPanicRequest := false
+	if len(localState.Peers.List) < 30 {
 		sendTrackerRequestTicker = time.NewTicker(time.Duration(10) * time.Second)
+		upcomingPanicRequest = true
 	} else {
 		sendTrackerRequestTicker = time.NewTicker(time.Duration(int(math.Min(float64(response_info.Interval), 300))) * time.Second)
+		upcomingPanicRequest = false
 	}
+
+	//This periodically checks number of peers we're connected to, so that we can reset sendTrackerRequest
+	//
+	periodicCheckNumberOfPeers := time.NewTicker(10 * time.Second)
+	go func() {
+		for {
+			<-periodicCheckNumberOfPeers.C
+			if upcomingPanicRequest {
+				continue
+			}
+			if len(localState.Peers.List) < 30 {
+				sendTrackerRequestTicker.Reset(time.Duration(10) * time.Second)
+				upcomingPanicRequest = true
+			}
+		}
+	}()
 
 	for {
 		select {
@@ -357,10 +376,6 @@ func main() {
 			localState.PeersLock.RLock()
 			CalculateUploadRate(&localState)
 			localState.PeersLock.RUnlock()
-
-		case <-sendKeepAliveTicker.C:
-			fmt.Println("sendKeepAlive()")
-			SendKeepAlive(&localState)
 		case <-printLocalStateTicker.C:
 			localState.PeersLock.RLock()
 			fmt.Println(localState)
@@ -379,7 +394,6 @@ func main() {
 					if err != nil {
 						return
 					}
-					fmt.Printf("peerID: %s\n", peerId)
 					peer.New = true
 					peer.Bitmap.New(localState.PieceHashes, localState.PieceLength, localState.FileSize)
 					peer.Connection = conn
@@ -387,12 +401,12 @@ func main() {
 					establishCh <- peer
 				}(p)
 			}
-			if response_info.Min_interval != 0 && len(localState.Peers.List) < 30 {
-				sendTrackerRequestTicker.Reset(time.Duration(response_info.Min_interval) * time.Second)
-			} else if len(localState.Peers.List) < 30 {
+			if len(localState.Peers.List) < 30 {
 				sendTrackerRequestTicker.Reset(time.Duration(5) * time.Second)
+				upcomingPanicRequest = true
 			} else {
 				sendTrackerRequestTicker.Reset(time.Duration(int(math.Min(float64(response_info.Interval), 300))) * time.Second)
+				upcomingPanicRequest = false
 			}
 		}
 
