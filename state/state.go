@@ -40,8 +40,11 @@ type State struct {
 	Top4         []*peer.Peer
 	BitmapLock   sync.RWMutex
 	Bitmap       bitmap.Bitmap
-	Cycle        int
 	RequestQueue []request.Request
+	PieceHashes  []byte
+	PieceLength  int64
+	FileSize     int64
+	NumPieces    int
 }
 
 func (s State) String() string {
@@ -68,6 +71,8 @@ func (s State) String() string {
 	output += fmt.Sprintf(" |  IP          : %s\n", s.IP.String())
 	output += fmt.Sprintf(" |  Port        : %d\n", s.Port)
 	output += fmt.Sprintf(" |  ID          : %s\n", s.ID)
+	output += fmt.Sprintf(" |  FileSize    : %d\n", s.FileSize)
+	output += fmt.Sprintf(" |  NumPieces   : %d\n", s.NumPieces)
 
 	output += " |  Peers       : ["
 	for i, peer := range s.Peers {
@@ -351,8 +356,8 @@ func (s *State) AmChoking() []peer.Peer {
 
 func (s *State) SetAmInterested() {
 	for p_idx := range s.Peers {
-		a := s.Bitmap.Get()
-		b := s.Peers[p_idx].Bitmap.Get()
+		a := s.Bitmap.Bitmap()
+		b := s.Peers[p_idx].Bitmap.Bitmap()
 
 		for i := range a {
 			if a[i] == false && b[i] == true {

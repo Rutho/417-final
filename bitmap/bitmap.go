@@ -9,11 +9,12 @@ import (
 type Bitmap struct {
 	// Description:
 	//
-	//   structure that stores a bitmap representing the download progress of the target file
+	//   structure that stores the download progress of a target file
 	//
 	// Fields:
 	//
-	//   TODO
+	//   Pieces_lock : for thread safety
+	//   Pieces      : slice of pieces
 
 	Pieces_lock *sync.RWMutex
 	Pieces      []Piece
@@ -22,19 +23,27 @@ type Bitmap struct {
 type Piece struct {
 	// Description:
 	//
-	//   TODO
+	//   A file is broken into pieces.
 	//
 	// Fields:
 	//
-	//   TODO
+	//   Index      : index of this piece
+	//   Length     : how many bytes in this piece
+	//   Hash       : hash of this piece
+	//   Blocks     : slice of blocks
+	//   Progress   : how many bytes downloaded
+	//   Complete   :
+	//   Incomplete :
+	//   FileOffset : how many bytes into the file this piece is
 
 	Index      int
 	Length     int64
 	Hash       []byte
 	Blocks     []Block
-	Progress   int
+	Progress   int64
 	Complete   bool
 	Incomplete bool
+	FileOffset int64
 }
 
 type Block struct {
@@ -51,7 +60,7 @@ type Block struct {
 
 	PieceIndex int
 	Offset     int
-	Length     int
+	Length     int64
 }
 
 func (b Bitmap) String() string {
@@ -78,7 +87,7 @@ func (b Bitmap) String() string {
 	if len(b.Pieces) > 100 {
 		count_ones := 0
 		count_zeros := 0
-		for _, bit := range b.Get() {
+		for _, bit := range b.Bitmap() {
 			if bit == true {
 				count_ones++
 			} else {
@@ -90,7 +99,7 @@ func (b Bitmap) String() string {
 	}
 
 	output += "["
-	for _, bit := range b.Get() {
+	for _, bit := range b.Bitmap() {
 		if bit == true {
 			output += "1"
 		} else {
@@ -100,14 +109,15 @@ func (b Bitmap) String() string {
 	return output + "]\n"
 }
 
-func (b *Bitmap) New(hashes []byte, piece_len int64) {
+func (b *Bitmap) New(hashes []byte, piece_len int64, file_len int64) {
 	// Description:
 	//
 	//   method on the Bitmap struct that initializes it
 	//
 	// Parameters:
 	//
-	//   length : an integer representing the length to initialize the bitmap with
+	//   hashes    : byte string consisting of the concatenation of all 20-byte SHA1 hash values, one per piece
+	//   piece_len : number of bytes in each piece
 	//
 	// Returns:
 	//
@@ -116,7 +126,7 @@ func (b *Bitmap) New(hashes []byte, piece_len int64) {
 	// Example usage:
 	//
 	//   var localState State
-	//   localState.Bitmap.New(50)
+	//   localState.Bitmap.New([]byte(torrent_file.Info["pieces"].(string)), torrent_file.Info["piece length"].(int64))
 	//   fmt.Println(localState.Bitmap)
 
 	if len(hashes) == 0 {
@@ -127,21 +137,36 @@ func (b *Bitmap) New(hashes []byte, piece_len int64) {
 		panic("New(): hash of each piece must be 20 bytes long")
 	}
 
-	// Split the concatenated hash values into pieces
+	// Make pieces
 	idx := 0
-	offset := 0
-	for offset < len(hashes) {
+	hash_offset := 0 // how many bytes into hashes we are currently at
+	var file_offset int64 = 0 // how many bytes into the file we are currently at
+	for hash_offset < len(hashes) {
+
+		// The last piece may be smaller in size
+		var min int64
+		if piece_len < file_len - file_offset {
+			min = piece_len
+		} else {
+			min = file_len - file_offset
+		}
+
+		// Create a new piece and initialize the fields
 		p := new(Piece)
 		p.Index      = idx
-		p.Length     = piece_len
-		p.Hash       = hashes[offset:offset+20]
+		p.Length     = min
+		p.Hash       = hashes[hash_offset:hash_offset+20]
 		p.Complete   = false
 		p.Incomplete = true
+		p.FileOffset = file_offset
 
+		// Add the piece to the bitmap
 		b.Pieces = append(b.Pieces, *p)
 
+		// Next piece
 		idx++
-		offset += 20
+		hash_offset += 20
+		file_offset += p.Length
 	}
 
 	b.Pieces_lock = new(sync.RWMutex)
@@ -264,7 +289,7 @@ func (b *Bitmap) AllDownloaded() bool {
 	return true
 }
 
-func (b *Bitmap) Get() []bool {
+func (b *Bitmap) Bitmap() []bool {
 	// Description:
 	//
 	//   method on the Bitmap struct that returns a boolean representation of the Pieces
@@ -281,7 +306,7 @@ func (b *Bitmap) Get() []bool {
 	//
 	//   var localState State
 	//   localState.Bitmap.New(50)
-	//   var bitfield []bool := localState.Bitmap.Get()
+	//   var bitfield []bool := localState.Bitmap.Bitmap()
 
 	b.Pieces_lock.RLock()
 	defer b.Pieces_lock.RUnlock()
@@ -315,7 +340,7 @@ func (b *Bitmap) Get() []bool {
 //
 //	var localState State
 //	localState.Bitmap.New(50)
-//	var bitfield []bool := localState.Bitmap.Get()
+//	var bitfield []bool := localState.Bitmap.Bitmap()
 func (b *Bitmap) Compress() ([]byte, int) {
 
 	b.Pieces_lock.RLock()
@@ -326,7 +351,7 @@ func (b *Bitmap) Compress() ([]byte, int) {
 	compressedBytes := int64(math.Ceil(float64(length) / float64(8)))
 	compressedBitfield := make([]byte, compressedBytes)
 	for i := 0; i < length; i++ {
-		if b.Get()[i] {
+		if b.Bitmap()[i] {
 			placedByte := i / 8
 			bitInByte := i - placedByte
 			compressedBitfield[placedByte] = compressedBitfield[placedByte] | (1 << (8 - (bitInByte + 1)))
@@ -336,8 +361,8 @@ func (b *Bitmap) Compress() ([]byte, int) {
 }
 
 func (b *Bitmap) HasExtraPieces(b2 *Bitmap) (bool, error) {
-	bitmap := b.Get()
-	b2_bitmap := b.Get()
+	bitmap := b.Bitmap()
+	b2_bitmap := b.Bitmap()
 
 	if len(bitmap) != len(b2_bitmap) {
 		fmt.Printf("HasExtraPieces error: unequal bitmap sizes")

@@ -8,7 +8,7 @@ package main
 //all requests that were asking for the same thing (same piece idx, offset; len should be the same for all messages except end of piece)
 //and send cancel messages to the peers that were the destination of these extra requests.
 //If piece messages for these requests do still come, we just ignore them.
-//The question is, do we consider these piece messages in our upload rate calculation?
+//The question is, do we consider these piece messages in our upload rate calculation? YES
 
 import (
 	"client/comms"
@@ -64,18 +64,19 @@ func main() {
 	// Initialize the IP address
 	localState.IP = net.ParseIP("127.0.0.1")
 
+	// Initialize the bitmap
+	localState.PieceLength = torrent_file.Info["piece length"].(int64)
+	localState.FileSize  = torrent_file.Info["length"].(int64)
+	localState.PieceHashes = []byte(torrent_file.Info["pieces"].(string))
+	localState.NumPieces   = len(localState.PieceHashes) / 20
+	localState.Bitmap.New(localState.PieceHashes, localState.PieceLength, localState.FileSize)
+
 	pieceLength := torrent_file.Info["piece length"].(int64)
 	//fmt.Printf("piece length: %d\n", pieceLength)
-	// Initialize the bitmap
 	numberOfpieces := int(math.Ceil(float64(len(torrent_file.Info["pieces"].(string))) / float64(20)))
-
-	localState.Bitmap.New([]byte(torrent_file.Info["pieces"].(string)), torrent_file.Info["piece length"].(int64))
 
 	// Generate an ID
 	localState.GenerateID()
-
-	// For use in Choke Algorithm
-	localState.Cycle = 0
 
 	// Store the peer list into the State struct
 	// --------
@@ -283,7 +284,7 @@ func main() {
 			}
 			fmt.Printf("peerID: %s\n", peerId)
 			peer.New = true
-			peer.Bitmap.New([]byte(torrent_file.Info["pieces"].(string)), torrent_file.Info["piece length"].(int64))
+			peer.Bitmap.New(localState.PieceHashes, localState.PieceLength, localState.FileSize)
 			peer.Connection = conn
 			peer.Peer_id = peerId
 			establishCh <- peer
@@ -357,7 +358,7 @@ func main() {
 					}
 					fmt.Printf("peerID: %s\n", peerId)
 					peer.New = true
-					peer.Bitmap.New([]byte(torrent_file.Info["pieces"].(string)), torrent_file.Info["piece length"].(int64))
+					peer.Bitmap.New(localState.PieceHashes, localState.PieceLength, localState.FileSize)
 					peer.Connection = conn
 					peer.Peer_id = peerId
 					establishCh <- peer
