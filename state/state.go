@@ -296,13 +296,13 @@ func (s State) PrintTop4() {
 	//   localState.ParseClargs()
 	//   fmt.Println(localState)
 
-	var output string = "Top4:\n"
+	var output string = "Top4:\n["
 
 	for i, peer := range s.Top4 {
 		if i == 0 {
 			output += fmt.Sprintf("%s uploadSpeed:%.2f", peer, peer.Upload_speed)
 		} else {
-			output += fmt.Sprintf(", %s uploadSpeed:%.2f", peer, peer.Upload_speed)
+			output += fmt.Sprintf("\n, %s", peer)
 		}
 	}
 	output += "]\n"
