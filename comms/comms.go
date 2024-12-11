@@ -292,7 +292,6 @@ func (conn *ConnectionState) SendRequest(pieceIdx uint32, start_offset uint32, n
 	var requestMsg Message
 	requestMsg.MsgLength = 13
 	requestMsg.MsgType = 6
-	requestMsg.Payload = make([]byte, 12)
 	pieceIdxBuf := make([]byte, 4)
 	startOffsetBuf := make([]byte, 4)
 	nBuf := make([]byte, 4)
@@ -300,6 +299,7 @@ func (conn *ConnectionState) SendRequest(pieceIdx uint32, start_offset uint32, n
 	binary.BigEndian.PutUint32(startOffsetBuf, start_offset)
 	binary.BigEndian.PutUint32(nBuf, n)
 	requestMsg.Payload = append(pieceIdxBuf, append(startOffsetBuf, nBuf...)...)
+	fmt.Printf("request payload: %v\n", requestMsg.Payload)
 	conn.sendMessage(requestMsg)
 }
 
@@ -332,7 +332,6 @@ func (conn *ConnectionState) SendCancel(pieceIdx uint32, start_offset uint32, n 
 	var cancelMsg Message
 	cancelMsg.MsgLength = 13
 	cancelMsg.MsgType = 8
-	cancelMsg.Payload = make([]byte, 12)
 	pieceIdxBuf := make([]byte, 4)
 	startOffsetBuf := make([]byte, 4)
 	nBuf := make([]byte, 4)
@@ -344,7 +343,7 @@ func (conn *ConnectionState) SendCancel(pieceIdx uint32, start_offset uint32, n 
 }
 
 func (conn *ConnectionState) sendMessage(msg Message) {
-	msgBytes := make([]byte, 4+msg.MsgLength)
+	msgBytes := make([]byte, 5)
 	binary.BigEndian.PutUint32(msgBytes, msg.MsgLength)
 	//fmt.Printf("sending msg type: %d\n", msg.MsgType)
 	msgBytes[4] = byte(msg.MsgType)

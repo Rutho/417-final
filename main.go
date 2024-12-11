@@ -300,7 +300,8 @@ func main() {
 		}(p)
 	}
 
-	// Separate goroutine to send requests for pieces
+	time.Sleep(20000000000)
+	//Separate goroutine to send requests for pieces
 	requestTicker := time.NewTicker(1 * time.Second)
 	go func() {
 		for range requestTicker.C {
@@ -312,8 +313,6 @@ func main() {
 			}
 		}
 	}()
-
-	time.Sleep(20000000000)
 
 	fmt.Println(localState)
 	fmt.Println(torrent_file.Announce)
