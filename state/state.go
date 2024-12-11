@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net"
 	"sync"
+	"time"
 )
 
 type State struct {
@@ -222,7 +223,11 @@ func (s *State) SendARequest() {
 	//
 	// Example usage:
 	//
-	//   TODO
+	//   localState.SendARequest()
+
+	if s.Bitmap.AllDownloaded() {
+		return
+	}
 
 	if len(s.RequestQueue) >= request.QueueSize {
 		return
@@ -244,6 +249,7 @@ func (s *State) SendARequest() {
 		min = s.Bitmap.Pieces[piece_index].Length - s.Bitmap.Pieces[piece_index].Pending
 	}
 
+	// Make a new block
 	b := new(bitmap.Block)
 	b.PieceIndex = piece_index
 	b.Offset     = s.Bitmap.Pieces[piece_index].Pending
@@ -251,14 +257,18 @@ func (s *State) SendARequest() {
 	b.Complete   = false
 	b.Incomplete = true
 
+	// Increase pending bytes
 	s.Bitmap.Pieces[piece_index].Pending += b.Length
 
+	// Make a new request
 	r := new(request.Request)
 	r.Block     = *b
 	r.Peer      = peer
 	r.Cancelled = false
+	r.Timestamp = time.Now().Unix()
 
-	s.RequestQueue = append(RequestQueue, r)
+	// Add the request to the queue
+	s.RequestQueue = append(s.RequestQueue, *r)
 
 	peer.Connection.SendRequest(uint32(piece_index), uint32(b.Offset), uint32(b.Length))
 }

@@ -192,9 +192,9 @@ func main() {
 					//Either peer is sending us stuff willy-nilly or piece was completed
 					//between the time we sent a request message to this peer and we received the piece message from this peer
 					//Latter case only happens if we're sending multiple requests for the same block to different peers
-					//Should we include these messages for the calculation of peer's upload rate then?
+					//Should we include these messages for the calculation of peer's upload rate then? YES
 					p := localState.FindPeer(msg.PeerId)
-					if !localState.Bitmap.Pieces[int(pieceIdx)].Complete() {
+					if localState.Bitmap.Pieces[int(pieceIdx)].Incomplete() {
 						buf := msg.Payload[8:]
 						p.Uploaded_bytes += int64(len(buf))
 
