@@ -284,3 +284,36 @@ func (s *State) SendARequest() bool {
 	fmt.Printf("Sent a request to %s\n", peer)
 	return false
 }
+
+func (s State) PrintTop4() {
+	// Description:
+	//
+	//   method on the State struct that provides a human-readable string representation
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   A string containing the formatted State information
+	//
+	// Example usage:
+	//
+	//   var localState State
+	//   localState.ParseClargs()
+	//   fmt.Println(localState)
+
+	var output string = "Top4:\n["
+
+	for i, peer := range s.Top4 {
+		if i == 0 {
+			output += fmt.Sprintf("%s uploadSpeed:%.2f", peer, peer.Upload_speed)
+		} else {
+			output += fmt.Sprintf("\n, %s", peer)
+		}
+	}
+	output += "]\n"
+
+	fmt.Println(output)
+}

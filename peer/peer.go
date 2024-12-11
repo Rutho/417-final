@@ -79,7 +79,9 @@ func (p Peer) String() string {
 	//   var peer Peer
 	//   fmt.Println(peer)
 
-	return fmt.Sprintf("%s:%d", p.Ip.String(), p.Port)
+	return fmt.Sprintf("%s:%d Am_choking:%t Am_int:%t peer_chok:%t peer_int:%t upload_speed:%.2f", 
+		p.Ip.String(), p.Port, p.Am_choking, p.Am_interested, p.Peer_choking, p.Peer_interested, p.Upload_speed)
+	//return fmt.Sprintf("%s:%d", p.Ip.String(), p.Port)
 }
 
 func (pl *Peers) FindPeerByID(peer_id string) *Peer {

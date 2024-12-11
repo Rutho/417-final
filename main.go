@@ -274,10 +274,10 @@ func main() {
 			case disconnectedPeerId := <-*disconnectCh:
 				fmt.Printf("disconnected: %s\n", disconnectedPeerId)
 				localState.RemovePeer(disconnectedPeerId)
-				localState.PeersLock.RLock()
+				localState.PeersLock.Lock()
 				localState.Top4Lock.Lock()
 				SortPeersAndUpdateTop4(&localState)
-				localState.PeersLock.RUnlock()
+				localState.PeersLock.Unlock()
 				localState.Top4Lock.Unlock()
 			}
 
@@ -376,11 +376,7 @@ func main() {
 		case <-optimisticUnchokingTicker.C:
 			fmt.Println("OptimisticUnchoking()")
 			// Lock and perform optimistic unchoking
-			localState.PeersLock.Lock()
-			localState.Top4Lock.Lock()
 			OptimisticUnchoking(&localState)
-			localState.Top4Lock.Unlock()
-			localState.Top4Lock.Lock()
 
 		case <-calculateUploadRateTicker.C:
 			fmt.Println("CalculateUploadRate()")
@@ -426,6 +422,11 @@ func main() {
 }
 
 func OptimisticUnchoking(localState *state.State) {
+	localState.PeersLock.Lock()
+	localState.Top4Lock.Lock()
+	defer localState.PeersLock.Unlock()
+	defer localState.Top4Lock.Unlock()
+
 	fmt.Println(localState)
 	if len(localState.Top4) == 4 && len(localState.Peers.List) > 4 {
 		SortPeersAndUpdateTop4(localState)
@@ -434,15 +435,24 @@ func OptimisticUnchoking(localState *state.State) {
 		var interested_peers []*peer.Peer
 		for i := range localState.Peers.List {
 			p := &localState.Peers.List[i]
+
 			if !contains(localState.Top4, p) {
+				p.Am_choking_lock.RLock()
 				if !p.Am_choking {
+					p.Am_choking_lock.RUnlock()
 					p.UpdateChoking(true)
 					p.Connection.SendChoke()
+				} else {
+					p.Am_choking_lock.RUnlock()
 				}
+
+				p.Peer_interested_lock.RLock()
 				if p.Am_interested {
 					interested_peers = append(interested_peers, p)
 				}
+				p.Peer_interested_lock.RUnlock()
 			}
+
 		}
 		if len(interested_peers) < 1 {
 			fmt.Println("No interested peers to unchoke")
@@ -453,6 +463,12 @@ func OptimisticUnchoking(localState *state.State) {
 		optimisticPeer := interested_peers[weightedRandomChoice(interested_peers)]
 		optimisticPeer.UpdateChoking(false)
 		optimisticPeer.Connection.SendUnchoke()
+		fmt.Printf("Unchoked: %s:%d\n", optimisticPeer.Ip, optimisticPeer.Port)
+
+		// print top4
+		localState.PrintTop4()
+	} else {
+		fmt.Println("Not enough peers for optimistic unchoking")
 	}
 }
 
@@ -464,30 +480,41 @@ func SortPeersAndUpdateTop4(localState *state.State) {
 	})
 
 	// Update the top 4. Top4 stores pointers to Peer
-	localState.Top4 = []*peer.Peer{}
+	var newTop4 []*peer.Peer
 	for i := 0; i < len(localState.Peers.List); i++ {
-		if len(localState.Top4) == 4 {
+		if len(newTop4) == 4 {
 			break
 		}
-		localState.Peers.List[i].Peer_interested_lock.RLock()
-		if localState.Peers.List[i].Peer_interested {
-			localState.Peers.List[i].Am_choking_lock.Lock()
-			if localState.Peers.List[i].Am_choking {
-				localState.Peers.List[i].Am_choking = false
-				localState.Peers.List[i].Connection.SendUnchoke()
-			}
-			localState.Peers.List[i].Am_choking_lock.Unlock()
 
-			localState.Top4 = append(localState.Top4, &localState.Peers.List[i])
+		localState.Peers.List[i].Am_choking_lock.RLock()
+		localState.Peers.List[i].Peer_interested_lock.RLock()
+		localState.Peers.List[i].Peer_choking_lock.RLock()
+
+		if localState.Peers.List[i].Peer_interested || !localState.Peers.List[i].Peer_choking {
+			if localState.Peers.List[i].Am_choking {
+				localState.Peers.List[i].Am_choking_lock.RUnlock()
+				localState.Peers.List[i].UpdateChoking(false)
+				localState.Peers.List[i].Connection.SendUnchoke()
+			} else {
+				localState.Peers.List[i].Am_choking_lock.RUnlock()
+			}
+
+			fmt.Println("appending")
+			newTop4 = append(newTop4, &localState.Peers.List[i])
 		}
+		localState.Peers.List[i].Peer_choking_lock.RUnlock()
 		localState.Peers.List[i].Peer_interested_lock.RUnlock()
 	}
+
+	localState.Top4 = newTop4
+	fmt.Println("After sort and update")
+	localState.PrintTop4()
 }
 
 // check if the given peer is in the top 4
 func contains(top_four []*peer.Peer, p *peer.Peer) bool {
-	for _, v := range top_four {
-		if v.Ip.Equal(p.Ip) && v.Port == p.Port {
+	for _, peer := range top_four {
+		if peer.Ip.Equal(p.Ip) && peer.Port == p.Port {
 			return true
 		}
 	}
