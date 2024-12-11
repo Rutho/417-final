@@ -152,9 +152,10 @@ func main() {
 				peer.UpdatePeerChoking(true)
 			case comms.Unchoke:
 				peer.UpdatePeerChoking(false)
+				p := localState.Peers.FindPeerByID(msg.PeerId)
+
 				// add to Top 4
-				if len(localState.Top4) < 4 {
-					p := localState.Peers.FindPeerByID(msg.PeerId)
+				if len(localState.Top4) < 4 && !contains(localState.Top4, p) {
 					localState.Top4 = append(localState.Top4, p)
 					p.UpdateChoking(false)
 					p.Connection.SendUnchoke()

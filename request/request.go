@@ -106,14 +106,14 @@ func SelectPeer(pl *peer.Peers) *peer.Peer {
 	return &interested_peers[rand_idx]
 }
 
-func Cancel(rq []Request) {
+func Cancel(rq *[]Request) {
 	// Description:
 	//
 	//   function to cancel in-flight outgoing requests
 	//
 	// Parameters:
 	//
-	//   a list of pending requests
+	//   a pointer to a list of pending requests
 	//
 	// Returns:
 	//
@@ -123,5 +123,9 @@ func Cancel(rq []Request) {
 	//
 	//   TODO
 
-	// TODO
+	// for i := range *rq {
+	// 	// rq
+	// }
+
+	*rq = nil
 }
