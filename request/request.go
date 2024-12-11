@@ -8,7 +8,7 @@ import (
 )
 
 const MaxBlockSize = 16384 // Maximum block size, in bytes
-const QueueSize    = 1     // How many pending requests can be in flight at once
+const QueueSize    = 10    // How many pending requests can be in flight at once
 
 type Request struct {
 	// Description:

@@ -229,10 +229,12 @@ func (s *State) SendARequest() bool {
 	defer s.RequestLock.Unlock()
 
 	if s.Bitmap.AllDownloaded() {
+		fmt.Println("Tried to SendARequest() but all pieces are downloaded")
 		return true
 	}
 
 	if len(s.RequestQueue) >= request.QueueSize {
+		fmt.Println("Tried to SendARequest() but the queue was full")
 		return false
 	}
 

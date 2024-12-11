@@ -16,6 +16,7 @@ import (
 	"client/filemanager"
 	"client/peer"
 	"client/request"
+	"client/receive"
 	"client/state"
 	"encoding/binary"
 	"fmt"
@@ -205,7 +206,9 @@ func main() {
 
 						f.WritePieceOffset(pieceIdx, int(pieceLength), pieceOffset, buf)
 						if f.IsPieceDownloaded(pieceIdx, int(pieceLength)) {
-							localState.Bitmap.MarkPiece(int(pieceIdx))
+							fmt.Printf("Process()\n")
+
+							receive.Process(&localState, pieceIdx, int64(pieceOffset), buf)
 							localState.PeersLock.Lock()
 							for i := range localState.Peers.List {
 								localState.Peers.List[i].Connection.SendHave(pieceIdx)
@@ -331,10 +334,7 @@ func main() {
 			SendKeepAlive(&localState)
 		}
 	}()
-<<<<<<< HEAD
-=======
 
->>>>>>> 9d2074c (moved periodic keep alive out of main select loop)
 	/*
 		Call Optimistic Unchoking every 30 seconds.
 		Calculate the upload rate of every peer every 10 seconds
@@ -343,10 +343,7 @@ func main() {
 	// Tickers for periodic tasks
 	optimisticUnchokingTicker := time.NewTicker(30 * time.Second)
 	calculateUploadRateTicker := time.NewTicker(10 * time.Second)
-<<<<<<< HEAD
-=======
 
->>>>>>> 9d2074c (moved periodic keep alive out of main select loop)
 	printLocalStateTicker := time.NewTicker(30 * time.Second)
 	var sendTrackerRequestTicker *time.Ticker
 	upcomingPanicRequest := false

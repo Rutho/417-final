@@ -3,11 +3,11 @@ package receive
 import (
 	"client/bitmap"
 	"client/state"
-	"client/peer"
+	"client/request"
 )
 
 
-func Process(s *state.State, p *peer.Peer, piece_index int, piece_offset int, buf []byte) {
+func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) {
 	// Description:
 	//
 	//   Handle the procedure upon receiving a Piece from a peeer
@@ -31,7 +31,7 @@ func Process(s *state.State, p *peer.Peer, piece_index int, piece_offset int, bu
 		panic("This isn't the block I asked for?!")
 	}
 
-	if len(buf) != block.Length{
+	if int64(len(buf)) != block.Length {
 		panic("The block I received is the wrong size?!")
 	}
 
@@ -40,14 +40,16 @@ func Process(s *state.State, p *peer.Peer, piece_index int, piece_offset int, bu
 	block.Incomplete = false
 
 	// Update the piece
-	piece.Pending -= len(buf)
-	piece.Progress += len(buf)
+	piece.Pending -= int64(len(buf))
+	piece.Progress += int64(len(buf))
 
 	// Identify the corresponding Request
 	var req *request.Request = nil
+	req_idx := 0
 	for i := range s.RequestQueue {
-		if s.RequestQueue[i].Block.Equals(Block) {
+		if s.RequestQueue[i].Block.Equals(block) {
 			req = &s.RequestQueue[i]
+			req_idx = i
 			break
 		}
 	}
@@ -57,9 +59,9 @@ func Process(s *state.State, p *peer.Peer, piece_index int, piece_offset int, bu
 	}
 
 	// Remove the Request from RequestQueue
-	s.RequestQueue[i] = s.RequestQueue[len(s.RequestQueue)-1]
+	s.RequestQueue[req_idx] = s.RequestQueue[len(s.RequestQueue)-1]
 	s.RequestQueue = s.RequestQueue[:len(s.RequestQueue)-1]
 
 	// Update the peer's upload rate
-	p.Uploaded_bytes += len(buf)
+	// req.Peer.Uploaded_bytes += int64(len(buf))
 }
