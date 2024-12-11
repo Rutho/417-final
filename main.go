@@ -69,7 +69,7 @@ func main() {
 	// Initialize the bitmap
 	numberOfpieces := int(math.Ceil(float64(len(torrent_file.Info["pieces"].(string))) / float64(20)))
 
-	localState.Bitmap.New(numberOfpieces)
+	localState.Bitmap.New([]byte(torrent_file.Info["pieces"].(string)), torrent_file.Info["piece length"].(int64))
 
 	// Generate an ID
 	localState.GenerateID()
@@ -283,7 +283,7 @@ func main() {
 			}
 			fmt.Printf("peerID: %s\n", peerId)
 			peer.New = true
-			peer.Bitmap.New(numberOfpieces)
+			peer.Bitmap.New([]byte(torrent_file.Info["pieces"].(string)), torrent_file.Info["piece length"].(int64))
 			peer.Connection = conn
 			peer.Peer_id = peerId
 			establishCh <- peer
@@ -357,7 +357,7 @@ func main() {
 					}
 					fmt.Printf("peerID: %s\n", peerId)
 					peer.New = true
-					peer.Bitmap.New(numberOfpieces)
+					peer.Bitmap.New([]byte(torrent_file.Info["pieces"].(string)), torrent_file.Info["piece length"].(int64))
 					peer.Connection = conn
 					peer.Peer_id = peerId
 					establishCh <- peer

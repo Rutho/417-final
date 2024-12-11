@@ -3,6 +3,7 @@ package state
 import (
 	"client/bitmap"
 	"client/peer"
+	"client/request"
 	"flag" // https://pkg.go.dev/flag
 	"fmt"  // https://pkg.go.dev/fmt
 	"math/rand"
@@ -27,18 +28,20 @@ type State struct {
 	//   Bitmap  : represents which pieces of the file being downloaded have been received
 	//   BitmapLock : TODO
 	//   Cycle  : control variable for usage in Choke Algorithm
+	//   RequestQueue : queue storing pending outgoing requests
 
-	TorrentFile string
-	IP          net.IP
-	Port        int
-	ID          string
-	PeersLock   sync.RWMutex
-	Top4Lock    sync.RWMutex
-	Peers       []peer.Peer
-	Top4        []*peer.Peer
-	BitmapLock  sync.RWMutex
-	Bitmap      bitmap.Bitmap
-	Cycle       int
+	TorrentFile  string
+	IP           net.IP
+	Port         int
+	ID           string
+	PeersLock    sync.RWMutex
+	Top4Lock     sync.RWMutex
+	Peers        []peer.Peer
+	Top4         []*peer.Peer
+	BitmapLock   sync.RWMutex
+	Bitmap       bitmap.Bitmap
+	Cycle        int
+	RequestQueue []request.Request
 }
 
 func (s State) String() string {
@@ -378,3 +381,66 @@ func (s *State) RemovePeer(PeerId string) {
 	}
 	s.Peers = append(s.Peers[:idx], s.Peers[idx+1:]...)
 }
+
+func (s *State) SendARequest() {
+	// Description:
+	//
+	//   method on the State struct to send a request to a peer for a piece
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   nothing
+	//
+	// Example usage:
+	//
+	//   TODO
+
+	peer := s.SelectPeer()
+
+	if peer == nil {
+		return
+	}
+
+	// TODO
+	// peer.Connection.SendRequest(idx, offset, length)
+}
+
+func (s *State) SelectPeer() *peer.Peer {
+	// Description:
+	//
+	//   method on the State struct to select a peer to send a request to
+	//
+	// Parameters:
+	//
+	//   none
+	//
+	// Returns:
+	//
+	//   a pointer to the peer, or nil upon error
+	//
+	// Example usage:
+	//
+	//   TODO
+
+	if request.QueueIsFull(s.RequestQueue) {
+		return nil
+	}
+
+	interested_peers := s.PeerInterested()
+
+	if len(interested_peers) == 0 {
+		return nil
+	}
+
+	// Pick a random peer
+	rand_idx := rand.Intn(len(interested_peers))
+
+	return &interested_peers[rand_idx]
+}
+
+
+
