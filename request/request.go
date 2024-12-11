@@ -91,7 +91,7 @@ func SelectPeer(pl *peer.Peers) *peer.Peer {
 	//
 	//   peer := request.SelectPeer(&localState.Peers)
 
-	interested_peers := pl.PeerInterested()
+	interested_peers := pl.AmInterested()
 
 	if len(interested_peers) == 0 {
 		return nil
