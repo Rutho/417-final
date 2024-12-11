@@ -124,6 +124,7 @@ func main() {
 					return
 				}
 				peer.Bitmap_lock.Lock()
+				// peer.Bitmap.New(localState.PieceHashes, localState.PieceLength, localState.FileSize)
 				for i, b := range msg.Payload {
 					for kth := 0; kth < 8; kth++ {
 						if (i*8)+kth >= numberOfpieces {
@@ -193,6 +194,7 @@ func main() {
 					//Latter case only happens if we're sending multiple requests for the same block to different peers
 					//Should we include these messages for the calculation of peer's upload rate then? YES
 					p := localState.FindPeer(msg.PeerId)
+					fmt.Printf("Received a Piece from %s\n", p)
 					if localState.Bitmap.Pieces[int(pieceIdx)].Incomplete() {
 						buf := msg.Payload[8:]
 						p.Uploaded_bytes += int64(len(buf))
@@ -212,7 +214,7 @@ func main() {
 										p.UpdateInterested(true)
 										p.Connection.SendInterested()
 									}
-								}(p)
+								}(&localState.Peers.List[i])
 							}
 							localState.PeersLock.Unlock()
 						}

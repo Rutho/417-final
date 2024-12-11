@@ -1,7 +1,7 @@
 package bitmap
 
 import (
-	"fmt"
+	// "fmt"
 	"math"
 	"sync"
 )
@@ -91,29 +91,33 @@ func (b Bitmap) String() string {
 
 	var output string = ""
 
-	if len(b.Pieces) > 100 {
-		count_ones := 0
-		count_zeros := 0
-		for _, bit := range b.Bitmap() {
-			if bit == true {
-				count_ones++
-			} else {
-				count_zeros++
-			}
-		}
-		output += fmt.Sprintf("Omitted due to length (number of 1s = %d, number of 0s = %d)\n", count_ones, count_zeros)
-		return output
-	}
+	// if len(b.Pieces) > 100 {
+	// 	count_ones := 0
+	// 	count_zeros := 0
+	// 	for _, bit := range b.Bitmap() {
+	// 		if bit == true {
+	// 			count_ones++
+	// 		} else {
+	// 			count_zeros++
+	// 		}
+	// 	}
+	// 	output += fmt.Sprintf("Omitted due to length (number of 1s = %d, number of 0s = %d)\n", count_ones, count_zeros)
+	// 	return output
+	// }
 
 	output += "["
-	for _, bit := range b.Bitmap() {
+	for i, bit := range b.Bitmap() {
 		if bit == true {
 			output += "1"
 		} else {
 			output += "0"
 		}
+		if i > 90 {
+			output += "..."
+			break
+		}
 	}
-	return output + "]\n"
+	return output + "]"
 }
 
 func (b *Bitmap) New(hashes []byte, piece_len int64, file_len int64) {
@@ -207,7 +211,7 @@ func (b *Bitmap) HasPiece(piece_index int) bool {
 func (b *Bitmap) MarkPiece(piece_index int) {
 	// Description:
 	//
-	//   method on the Bitmap struct that marks a specific piece as downloaded
+	//   method on the Bitmap struct that marks a specific piece as downloaded/complete
 	//
 	// Parameters:
 	//
@@ -227,6 +231,7 @@ func (b *Bitmap) MarkPiece(piece_index int) {
 	b.Pieces_lock.Lock()
 	defer b.Pieces_lock.Unlock()
 
+	// fmt.Printf("MarkPiece(%d): %d = %d\n", piece_index, b.Pieces[piece_index].Progress, b.Pieces[piece_index].Length)
 	b.Pieces[piece_index].Progress = b.Pieces[piece_index].Length
 }
 
@@ -333,20 +338,34 @@ func (b *Bitmap) Compress() ([]byte, int) {
 }
 
 func (b *Bitmap) HasExtraPieces(b2 *Bitmap) (bool, error) {
-	bitmap := b.Bitmap()
-	b2_bitmap := b.Bitmap()
+	// bitmap := b.Bitmap()
+	// b2_bitmap := b.Bitmap()
 
-	if len(bitmap) != len(b2_bitmap) {
-		fmt.Printf("HasExtraPieces error: unequal bitmap sizes")
-		return false, fmt.Errorf("Unequal bitmap sizes")
-	}
-	bitmapSize := len(b2_bitmap)
+	// if len(bitmap) != len(b2_bitmap) {
+	// 	fmt.Println("HasExtraPieces error: unequal bitmap sizes")
+	// 	return false, fmt.Errorf("Unequal bitmap sizes")
+	// }
+	// bitmapSize := len(b2_bitmap)
+	// b.Pieces_lock.RLock()
+	// b2.Pieces_lock.RLock()
+	// defer b.Pieces_lock.RUnlock()
+	// defer b2.Pieces_lock.RUnlock()
+	// for i := 0; i < bitmapSize; i++ {
+	// 	// fmt.Printf("%t == %t\n", bitmap[i], b2_bitmap[i])
+ //
+	// 	if bitmap[i] == false && b2_bitmap[i] == true {
+	// 		fmt.Println("Peer has pieces that I need")
+	// 		return true, nil
+	// 	}
+	// }
+	// return false, nil
+
 	b.Pieces_lock.RLock()
 	b2.Pieces_lock.RLock()
 	defer b.Pieces_lock.RUnlock()
 	defer b2.Pieces_lock.RUnlock()
-	for i := 0; i < bitmapSize; i++ {
-		if bitmap[i] == false && b2_bitmap[i] == true {
+	for i := 0; i < len(b.Pieces); i++ {
+		if b.Pieces[i].PendingIncomplete() && b2.Pieces[i].Complete() {
 			return true, nil
 		}
 	}

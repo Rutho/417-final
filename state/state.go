@@ -96,6 +96,7 @@ func (s State) String() string {
 	output += "]\n"
 
 	output += " |  Bitmap      : " + fmt.Sprintf(s.Bitmap.String())
+	output += "\n"
 
 	return output
 }
@@ -236,6 +237,7 @@ func (s *State) SendARequest() {
 	peer := request.SelectPeer(&s.Peers)
 
 	if peer == nil {
+		fmt.Println("Tried to SendARequest() but no peer was found!")
 		return
 	}
 
@@ -271,5 +273,7 @@ func (s *State) SendARequest() {
 	s.RequestQueue = append(s.RequestQueue, *r)
 
 	peer.Connection.SendRequest(uint32(piece_index), uint32(b.Offset), uint32(b.Length))
+
+	fmt.Printf("Sent a request to %s\n", peer)
 }
 
