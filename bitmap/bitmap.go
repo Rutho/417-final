@@ -30,20 +30,21 @@ type Piece struct {
 	//   Index      : index of this piece
 	//   Length     : size of this piece, in bytes
 	//   Hash       : hash of this piece
+	//   FileOffset : how many bytes into the file this piece is
+	//   Piece_lock : for thread safety
 	//   Blocks     : slice of blocks representing this piece. Blocks may overlap (?)
 	//   Progress   : how many bytes are currently downloaded
 	//   Pending    : how many bytes are downloaded, assuming in-flight requests succeed
-	//   FileOffset : how many bytes into the file this piece is
 
 	Index      int
 	Length     int64
 	Hash       []byte
+	FileOffset int64
+	Piece_lock *sync.RWMutex
+
 	Blocks     []Block
 	Progress   int64
 	Pending    int64
-	FileOffset int64
-
-	Piece_lock *sync.RWMutex
 }
 
 type Block struct {
@@ -64,6 +65,7 @@ type Block struct {
 	PieceIndex int
 	Offset     int64
 	Length     int64
+
 	Complete   bool
 	Incomplete bool
 }
@@ -447,3 +449,14 @@ func (p *Piece) PendingIncomplete() bool {
 	defer p.Piece_lock.RUnlock()
 	return p.Pending < p.Length
 }
+
+
+
+func (a *Block) Equals(b *Block) bool {
+	// Description:
+	//
+	//    method on the Block struct that returns true if a and b are equal
+
+	return a.PieceIndex == b.PieceIndex && a.Offset == b.Offset && a.Length == b.Length
+}
+
