@@ -361,6 +361,7 @@ func (conn *ConnectionState) TwoWayHandshake(pstr string, initiator bool) (strin
 			conn.infoHash, conn.clientId)
 		if err != nil {
 			fmt.Println("sendHandshake: fprintf error:", err)
+			(*conn.Conn).Close()
 			return err
 		}
 		return nil

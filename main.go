@@ -315,11 +315,11 @@ func main() {
 				localState.PeersLock.Lock()
 				localState.Peers.List = append(localState.Peers.List, connectedPeer) //deep copy
 				localState.PeersLock.Unlock()
-				go func(peer peer.Peer) {
+				go func() {
 					for _, b := range localState.Bitmap.Complete() {
 						connectedPeer.Connection.SendHave(uint32(b.Index))
 					}
-				}(connectedPeer)
+				}()
 				go func() {
 					err := s.ReadLoop(connectedPeer.Connection)
 					if err != nil {
@@ -328,12 +328,20 @@ func main() {
 				}()
 			case disconnectedPeerId := <-*disconnectCh:
 				fmt.Printf("disconnected: %s\n", disconnectedPeerId)
-				localState.RemovePeer(disconnectedPeerId)
-				localState.PeersLock.Lock()
-				localState.Top4Lock.Lock()
-				SortPeersAndUpdateTop4(&localState)
-				localState.PeersLock.Unlock()
-				localState.Top4Lock.Unlock()
+				localState.PeersLock.RLock()
+				pp := localState.Peers.FindPeerByID(disconnectedPeerId)
+				if pp != nil {
+					(*pp.Connection.Conn).Close()
+					localState.PeersLock.RUnlock()
+					localState.RemovePeer(disconnectedPeerId)
+					localState.PeersLock.Lock()
+					localState.Top4Lock.Lock()
+					SortPeersAndUpdateTop4(&localState)
+					localState.PeersLock.Unlock()
+					localState.Top4Lock.Unlock()
+				} else {
+					localState.PeersLock.RUnlock()
+				}
 			}
 
 			//buf, n := localState.Bitmap.Compress()
