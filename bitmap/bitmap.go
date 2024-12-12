@@ -551,9 +551,9 @@ func (b Block) String() string {
 
 func (p *Piece) Reset() {
 	for i := range p.Blocks {
-		p.Blocks.Buf        = nil
-		p.Blocks.Complete   = false
-		p.Blocks.Incomplete = true
+		p.Blocks[i].Buf        = nil
+		p.Blocks[i].Complete   = false
+		p.Blocks[i].Incomplete = true
 	}
 	p.Progress = 0
 	p.Pending  = 0
