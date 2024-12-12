@@ -128,7 +128,6 @@ func VerifyPieceHash(s *state.State, buf []byte, piece_index int) bool {
 func PieceCompleted(s *state.State, piece_index int) {
 	// This function is run once a piece is fully downloaded
 	fmt.Printf("Piece %d fully downloaded!\n", piece_index)
-
 	// Send "Have" messages
 	for i := range s.Peers.List {
 		s.Peers.List[i].Connection.SendHave(uint32(piece_index))
