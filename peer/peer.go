@@ -77,7 +77,7 @@ func (p Peer) String() string {
 	//   var peer Peer
 	//   fmt.Println(peer)
 
-	return fmt.Sprintf("%s:%d Am_choking:%t Am_int:%t peer_chok:%t peer_int:%t uploaded_bytes:%.2f",
+	return fmt.Sprintf("%s:%d Am_choking:%t Am_int:%t peer_chok:%t peer_int:%t uploaded_bytes:%d",
 		p.Ip.String(), p.Port, p.Am_choking, p.Am_interested, p.Peer_choking, p.Peer_interested, p.Uploaded_bytes)
 	//return fmt.Sprintf("%s:%d", p.Ip.String(), p.Port)
 }

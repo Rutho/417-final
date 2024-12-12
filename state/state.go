@@ -225,6 +225,7 @@ func (s *State) SendARequest() bool {
 
 	s.PeersLock.Lock()
 	s.BitmapLock.Lock()
+
 	defer s.PeersLock.Unlock()
 	defer s.BitmapLock.Unlock()
 
@@ -234,7 +235,7 @@ func (s *State) SendARequest() bool {
 	}
 
 	if len(s.RequestQueue) >= request.QueueSize {
-		// fmt.Println("Tried to SendARequest() but the queue was full")
+		fmt.Println("Tried to SendARequest() but the queue was full")
 		return false
 	}
 
@@ -256,8 +257,7 @@ func (s *State) SendARequest() bool {
 	}
 
 	if min == 0 {
-		fmt.Println("[ERROR] Can't request a block of size zero!")
-		return false
+		panic("Can't request a block of size zero!")
 	}
 
 	// Make a new block
@@ -283,8 +283,8 @@ func (s *State) SendARequest() bool {
 
 	peer.Connection.SendRequest(uint32(piece_index), uint32(b.Offset), uint32(b.Length))
 
-	s.RN += 1
-	fmt.Printf("REQUEST %d %s\n", s.RN, r.Block)
+	fmt.Printf("REQUEST %d\n", piece_index)
+	// fmt.Printf("REQUEST %s\n", r.Block)
 	return false
 }
 
