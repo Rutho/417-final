@@ -29,11 +29,16 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 		return false
 	}
 
-	// Update the block
+	// Did we already receive this block?
 	if s.RequestQueue[req_idx].Block.Buf != nil {
-		panic("Tried to write to a block that already has data??")
+		fmt.Println("Tried to write to a block that already has data??")
+		return false
 	}
-	copy(s.RequestQueue[req_idx].Block.Buf, buf)
+
+	// Update the block
+	for i := range buf {
+		s.RequestQueue[req_idx].Block.Buf = append(s.RequestQueue[req_idx].Block.Buf, buf[i])
+	}
 	s.RequestQueue[req_idx].Block.Complete = true
 	s.RequestQueue[req_idx].Block.Incomplete = false
 
@@ -43,6 +48,9 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	// Update the block again for good measure (???)
 	for i := range s.Bitmap.Pieces[piece_index].Blocks {
 		if s.Bitmap.Pieces[piece_index].Blocks[i].Equals(s.RequestQueue[req_idx].Block) {
+			// if s.Bitmap.Pieces[piece_index].Blocks[i].Buf != nil {
+				// fmt.Println("it's already got data.")
+			// }
 			copy(s.Bitmap.Pieces[piece_index].Blocks[i].Buf, buf)
 		}
 	}
@@ -62,7 +70,8 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 		for _, b := range s.Bitmap.Pieces[piece_index].Blocks {
 			fmt.Printf("%s ", b)
 			if b.Buf == nil {
-				panic("Block has no data!?")
+				// panic("Block has no data!?")
+				fmt.Printf("<-NO DATA ")
 			}
 		}
 		fmt.Printf("\n")
