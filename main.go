@@ -332,6 +332,9 @@ func main() {
 	go func() {
 		for range requestTicker.C {
 			if localState.SendARequest() {
+
+				fmt.Println("STOP!!!!!!!!!")
+
 				// Stop sending requests
 				requestTicker.Stop()
 				// Cancel outgoing requests
@@ -344,16 +347,9 @@ func main() {
 	requestQueueCleanerTicker := time.NewTicker(1 * time.Second)
 	go func() {
 		for range requestQueueCleanerTicker.C {
-			// Iterate in reverse to safely remove items
-			for i := len(localState.RequestQueue) - 1; i >= 0; i-- {
-				if time.Now().Unix()-localState.RequestQueue[i].Timestamp > 4 {
-					localState.RequestQueue[i].Clean(&localState.Bitmap)
-
-					// Remove the item by replacing it with the last item and reslicing
-					localState.RequestQueue[i] = localState.RequestQueue[len(localState.RequestQueue)-1]
-					localState.RequestQueue = localState.RequestQueue[:len(localState.RequestQueue)-1]
-				}
-			}
+			localState.RequestLock.Lock()
+			request.Clean(&localState.RequestQueue, &localState.Bitmap)
+			localState.RequestLock.Unlock()
 		}
 	}()
 

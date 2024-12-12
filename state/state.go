@@ -223,10 +223,12 @@ func (s *State) SendARequest() bool {
 	//
 	//   localState.SendARequest()
 
+	s.RequestLock.Lock()
 	s.PeersLock.Lock()
 	s.BitmapLock.Lock()
 	defer s.PeersLock.Unlock()
 	defer s.BitmapLock.Unlock()
+	defer s.RequestLock.Unlock()
 
 	if s.Bitmap.AllDownloaded() {
 		fmt.Println("Tried to SendARequest() but all pieces are downloaded")
@@ -270,7 +272,7 @@ func (s *State) SendARequest() bool {
 	peer.Connection.SendRequest(uint32(piece_index), uint32(block.Offset), uint32(block.Length))
 
 	// fmt.Printf("REQUEST %d\n", piece_index)
-	fmt.Printf("REQUEST %s\n", r.Block)
+	// fmt.Printf("REQUEST %s\n", r.Block)
 	return false
 }
 

@@ -96,19 +96,23 @@ func (b Bitmap) String() string {
 
 	var output string = ""
 
-	// if len(b.Pieces) > 100 {
-	// 	count_ones := 0
-	// 	count_zeros := 0
-	// 	for _, bit := range b.Bitmap() {
-	// 		if bit == true {
-	// 			count_ones++
-	// 		} else {
-	// 			count_zeros++
-	// 		}
-	// 	}
-	// 	output += fmt.Sprintf("Omitted due to length (number of 1s = %d, number of 0s = %d)\n", count_ones, count_zeros)
-	// 	return output
-	// }
+	// Calculate the total number of blocks
+	num_b := 0
+	for i := range b.Pieces {
+		num_b += len(b.Pieces[i].Blocks)
+	}
+
+	// Calculate how many blocks are complete
+	completed_b := 0
+	for i := range b.Pieces {
+		for j := range b.Pieces[i].Blocks {
+			if b.Pieces[i].Blocks[j].Complete {
+				completed_b += 1
+			}
+		}
+	}
+
+	prog := fmt.Sprintf("(%d/%d)", completed_b, num_b)
 
 	output += "["
 	for i, bit := range b.Bitmap() {
@@ -118,7 +122,7 @@ func (b Bitmap) String() string {
 			output += "0"
 		}
 		if i > 80 {
-			output += fmt.Sprintf("...] (%d/%d)", len(b.Complete()), len(b.Pieces))
+			output += fmt.Sprintf("...] Pieces: (%d/%d) Blocks: %s", len(b.Complete()), len(b.Pieces), prog)
 			return output
 		}
 	}
@@ -450,8 +454,8 @@ func (p *Piece) BlocksDone() int {
 }
 
 func (b *Bitmap) InProgress() []Piece {
-	// Description:
-	//    Returns a list of Pieces that have at least 1 block downloaded but not completely done
+	// Returns:
+	//    a list of Pieces that have at least 1 block downloaded but not all
 
 	b.Pieces_lock.RLock()
 	defer b.Pieces_lock.RUnlock()

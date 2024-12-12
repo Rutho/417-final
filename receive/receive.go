@@ -19,6 +19,9 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	//   false if something went wrong
 	//   true otherwise
 
+	s.RequestLock.Lock()
+	defer s.RequestLock.Unlock()
+
 	// Use it to find the request
 	req_idx := FindRequest(s.RequestQueue, piece_index, piece_offset, int64(len(buf)))
 	if req_idx == -1 {
@@ -27,7 +30,7 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	}
 
 	// Update the block
-	if s.RequestQueue[req_idx].Block.Buf == nil {
+	if s.RequestQueue[req_idx].Block.Buf != nil {
 		panic("Tried to write to a block that already has data??")
 	}
 	copy(s.RequestQueue[req_idx].Block.Buf, buf)
@@ -59,7 +62,7 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 		for _, b := range s.Bitmap.Pieces[piece_index].Blocks {
 			fmt.Printf("%s ", b)
 			if b.Buf == nil {
-				panic("ummm... something went wrong.")
+				panic("Block has no data!?")
 			}
 		}
 		fmt.Printf("\n")

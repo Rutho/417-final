@@ -5,6 +5,7 @@ import (
 	"client/peer"
 	"math/rand"
 	"sync"
+	"time"
 )
 
 const MaxBlockSize = 16384 // Maximum block size, in bytes
@@ -185,7 +186,7 @@ func Cancel(rq *[]Request) {
 	*rq = nil
 }
 
-func (r *Request) Clean(b *bitmap.Bitmap) {
+func Clean(rq *[]Request, b *bitmap.Bitmap) {
 	// Description:
 	//
 	//   a request was never answered
@@ -202,8 +203,14 @@ func (r *Request) Clean(b *bitmap.Bitmap) {
 	//
 	//   TODO
 
-	// b.Pieces_lock.Lock()
-	// defer b.Pieces_lock.Unlock()
+	// Iterate in reverse to safely remove items
+	for i := len(*rq) - 1; i >= 0; i-- {
+		if time.Now().Unix()-(*rq)[i].Timestamp > 4 {
+			b.Pieces[(*rq)[i].Block.PieceIndex].Pending -= (*rq)[i].Block.Length
 
-	b.Pieces[r.Block.PieceIndex].Pending -= r.Block.Length
+			// Remove the item by replacing it with the last item and reslicing
+			(*rq)[i] = (*rq)[len(*rq)-1]
+			(*rq) = (*rq)[:len(*rq)-1]
+		}
+	}
 }
