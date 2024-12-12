@@ -67,15 +67,15 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	// Check the hash of the piece if it's complete
 	ok := true
 	if s.Bitmap.Pieces[piece_index].Complete() {
-		fmt.Printf("Piece %d fully downloaded, verifying hash...\n", piece_index)
-		for _, b := range s.Bitmap.Pieces[piece_index].Blocks {
-			fmt.Printf("%s ", b)
-			if b.Buf == nil {
-				// panic("Block has no data!?")
-				fmt.Printf("<-NO DATA ")
-			}
-		}
-		fmt.Printf("\n")
+		// fmt.Printf("Piece %d fully downloaded, verifying hash...\n", piece_index)
+		// for _, b := range s.Bitmap.Pieces[piece_index].Blocks {
+		// 	fmt.Printf("%s ", b)
+		// 	if b.Buf == nil {
+		// 		// panic("Block has no data!?")
+		// 		fmt.Printf("<-NO DATA ")
+		// 	}
+		// }
+		// fmt.Printf("\n")
 
 		ok = VerifyPieceHash(s, Aggregate(piece), piece_index)
 		if !ok {
@@ -84,18 +84,12 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 
 			fmt.Printf("Piece %d fully downloaded, but hash is incorrect.\n", piece_index)
 		} else {
-			fmt.Printf("Piece %d fully downloaded!\n", piece_index)
-			
-			for i := range s.Peers.List {
-				s.Peers.List[i].Connection.SendHave(uint32(piece_index))
-			}
+			PieceCompleted(s, piece_index)
 		}
 	} else {
 		// fmt.Printf("Piece %d not yet fully downloaded. Progress = %d / %d\n", piece_index, piece.Progress, piece.Length)
 	}
 
-	// Update the peer's upload rate
-	// req.Peer.Uploaded_bytes += int64(len(buf))
 	return ok
 }
 
@@ -133,6 +127,24 @@ func VerifyPieceHash(s *state.State, buf []byte, piece_index int) bool {
 
 	// compare the hashes
 	return bytes.Equal(e_hash, r_hash)
+}
+
+func PieceCompleted(s *state.State, piece_index int) {
+	// This function is run once a piece is fully downloaded
+	fmt.Printf("Piece %d fully downloaded!\n", piece_index)
+
+	// Send "Have" messages
+	for i := range s.Peers.List {
+		s.Peers.List[i].Connection.SendHave(uint32(piece_index))
+	}
+
+	// Write the piece to the file
+	s.FM.WriteOffset(s.Bitmap.Pieces[piece_index].FileOffset, Aggregate(&s.Bitmap.Pieces[piece_index]))
+
+	// Release the memory associated with the piece
+	for i := range s.Bitmap.Pieces[piece_index].Blocks {
+		s.Bitmap.Pieces[piece_index].Blocks[i].Buf = nil
+	}
 }
 
 func FindRequest(rq []request.Request, idx int, offset int64, length int64) int {

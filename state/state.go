@@ -4,6 +4,7 @@ import (
 	"client/bitmap"
 	"client/peer"
 	"client/request"
+	"client/filemanager"
 	"flag" // https://pkg.go.dev/flag
 	"fmt"  // https://pkg.go.dev/fmt
 	"math/rand"
@@ -49,6 +50,7 @@ type State struct {
 	Info_hash    []byte
 	Optimistic   *peer.Peer
 	Seeder       bool
+	FM           *filemanager.FileManager
 }
 
 func (s State) String() string {

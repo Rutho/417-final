@@ -55,8 +55,8 @@ func main() {
 	torrent_file.Tracker_Type = data.HTTP
 	data.Send_get(request_info, torrent_file, response_info)
 	infoHashStr := torrent_file.Info["pieces"].(string)
-	f := filemanager.Open(torrent_file.Info["name"].(string), []byte(infoHashStr))
-	fmt.Printf("Saving to %s\n", f.Filename)
+	localState.FM = filemanager.Open(torrent_file.Info["name"].(string), []byte(infoHashStr))
+	fmt.Printf("Saving to %s\n", localState.FM.Filename)
 
 	// --------
 	// Initialize State
@@ -230,9 +230,9 @@ func main() {
 					p.Uploaded_bytes += int64(len(buf))
 					/*
 						// Write to the file
-						f.WritePieceOffset(pieceIdx, int(pieceLength), pieceOffset, buf)
+						localState.FM.WritePieceOffset(pieceIdx, int(pieceLength), pieceOffset, buf)
 
-						if f.IsPieceDownloaded(pieceIdx, int(pieceLength)) {
+						if localState.FM.IsPieceDownloaded(pieceIdx, int(pieceLength)) {
 							localState.PeersLock.Lock()
 							for i := range localState.Peers.List {
 								localState.Peers.List[i].Connection.SendHave(pieceIdx)
@@ -265,7 +265,7 @@ func main() {
 						return
 					}
 					length := binary.BigEndian.Uint32(msg.Payload[8:12])
-					buf, n, err := f.ReadPieceOffset(pieceIdx, int(pieceLength), pieceOffset, length)
+					buf, n, err := localState.FM.ReadPieceOffset(pieceIdx, int(pieceLength), pieceOffset, length)
 					if err != nil && err != io.EOF {
 						fmt.Println("Processing Request MSG: read piece offset:", err)
 					}
