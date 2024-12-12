@@ -114,6 +114,9 @@ func main() {
 		for msg := range msgCh {
 			//fmt.Printf("peer address: %s\n", msg.PeerAddress)
 			peer := localState.Peers.FindPeerByID(msg.PeerId)
+			if peer == nil {
+				continue
+			}
 			switch msg.MsgType {
 			case comms.Bitfield:
 				//Bitfield size can differ a little from numberOfPieces since
