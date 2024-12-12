@@ -366,6 +366,8 @@ func Send_http(request *Tracker_request, ip string, g_port int, response *Tracke
 			tmp_peer.Peer_interested_lock = new(sync.RWMutex)
 			tmp_peer.Bitmap_lock = new(sync.RWMutex)
 
+			tmp_peer.New = true;
+
 			*response.Peers = append(*response.Peers, tmp_peer)
 			// fmt.Println(tmp_peer.String())
 		}

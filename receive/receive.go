@@ -72,7 +72,7 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 			fmt.Printf("Piece %d fully downloaded, but hash is incorrect.\n", piece_index)
 		} else {
 			fmt.Printf("Piece %d fully downloaded!\n", piece_index)
-
+			
 			for i := range s.Peers.List {
 				s.Peers.List[i].Connection.SendHave(uint32(piece_index))
 			}

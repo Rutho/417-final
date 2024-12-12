@@ -52,6 +52,7 @@ type Peer struct {
 	Peer_interested      bool
 	Peer_id              string
 	Uploaded_bytes       int64
+	Downloaded_bytes     int64
 	Bitmap_lock          *sync.RWMutex
 	Bitmap               bitmap.Bitmap
 	Top4_lock            *sync.RWMutex

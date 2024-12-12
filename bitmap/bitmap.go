@@ -265,6 +265,7 @@ func (b *Bitmap) AllDownloaded() bool {
 			return false
 		}
 	}
+
 	return true
 }
 
