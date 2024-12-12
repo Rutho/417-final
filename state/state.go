@@ -268,7 +268,7 @@ func (s *State) SendARequest() bool {
 	peer.Connection.SendRequest(uint32(piece_index), uint32(block.Offset), uint32(block.Length))
 
 	// fmt.Printf("REQUEST %d\n", piece_index)
-	// fmt.Printf("REQUEST %s\n", r.Block)
+	fmt.Printf("REQUEST %s\n", r.Block)
 	return false
 }
 

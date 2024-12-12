@@ -148,6 +148,10 @@ func SelectPeer(pl *peer.Peers) *peer.Peer {
 		}
 	}
 
+	if len(not_choking_us) == 0 {
+		return nil
+	}
+
 	// Pick a random peer
 	rand_idx := rand.Intn(len(not_choking_us))
 

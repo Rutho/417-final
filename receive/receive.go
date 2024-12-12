@@ -27,28 +27,43 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	}
 
 	// Update the block
-	s.RequestQueue[req_idx].Block.Buf = buf
+	if s.RequestQueue[req_idx].Block.Buf == nil {
+		panic("Tried to write to a block that already has data??")
+	}
+	copy(s.RequestQueue[req_idx].Block.Buf, buf)
 	s.RequestQueue[req_idx].Block.Complete = true
 	s.RequestQueue[req_idx].Block.Incomplete = false
+
+	// Get Piece
+	piece := &s.Bitmap.Pieces[piece_index]
+
+	// Update the block again for good measure (???)
+	for i := range s.Bitmap.Pieces[piece_index].Blocks {
+		if s.Bitmap.Pieces[piece_index].Blocks[i].Equals(s.RequestQueue[req_idx].Block) {
+			copy(s.Bitmap.Pieces[piece_index].Blocks[i].Buf, buf)
+		}
+	}
 
 	// Remove the Request from RequestQueue
 	s.RequestQueue[req_idx] = s.RequestQueue[len(s.RequestQueue)-1]
 	s.RequestQueue = s.RequestQueue[:len(s.RequestQueue)-1]
 
-	// Get Piece
-	piece := &s.Bitmap.Pieces[piece_index]
 
 	// Update the piece
-	piece.Progress += int64(len(buf))
+	s.Bitmap.Pieces[piece_index].Progress += int64(len(buf))
 
 	// Check the hash of the piece if it's complete
 	ok := true
-	if piece.Complete() {
+	if s.Bitmap.Pieces[piece_index].Complete() {
 		fmt.Printf("Piece %d fully downloaded, verifying hash...\n", piece_index)
 		for _, b := range s.Bitmap.Pieces[piece_index].Blocks {
 			fmt.Printf("%s ", b)
+			if b.Buf == nil {
+				panic("ummm... something went wrong.")
+			}
 		}
 		fmt.Printf("\n")
+
 		ok = VerifyPieceHash(s, Aggregate(piece), piece_index)
 		if !ok {
 			// Reset the piece

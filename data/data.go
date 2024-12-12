@@ -311,10 +311,14 @@ func Send_http(request *Tracker_request, ip string, g_port int, response *Tracke
 
 	var got_string string = string(bun[:])
 
-	tokend := strings.Split(got_string, "\r\n")
+	// tokend := strings.Split(got_string, "\r\n")
 
-	tmp_data := strings.NewReader(tokend[len(tokend)-1])
-	ben_data, err := bencode.Decode(tmp_data)
+	// tmp_data := strings.NewReader(tokend[len(tokend)-1])
+	pos := strings.Index(got_string, "d8")
+
+	usable := strings.NewReader(got_string[pos:])
+
+	ben_data, err := bencode.Decode(usable)
 	check(err)
 
 	interval, ok := ben_data["interval"].(int64)

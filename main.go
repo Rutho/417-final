@@ -209,6 +209,10 @@ func main() {
 
 					buf := msg.Payload[8:]
 
+					if len(buf) == 0 {
+						panic("payload is size 0")
+					}
+
 					p := localState.Peers.FindPeerByID(msg.PeerId)
 
 					// fmt.Printf("GOT Piece %d %d\n", pieceIdx, pieceOffset)
