@@ -519,7 +519,7 @@ func OptimisticUnchoking(localState *state.State) {
 func SortPeersAndUpdateTop4(localState *state.State) {
 	// Sort the peers in descending order of upload speed. Latest unchoked peer may be a replacement
 	sort.SliceStable(localState.Peers.List, func(i, j int) bool {
-		return (localState.Peers.List)[i].Upload_speed > (localState.Peers.List)[j].Upload_speed
+		return (localState.Peers.List)[i].Uploaded_bytes > (localState.Peers.List)[j].Uploaded_bytes
 	})
 
 	// Update the top 4. Top4 stores pointers to Peer
@@ -542,7 +542,6 @@ func SortPeersAndUpdateTop4(localState *state.State) {
 				localState.Peers.List[i].Am_choking_lock.RUnlock()
 			}
 
-			fmt.Println("appending")
 			newTop4 = append(newTop4, &localState.Peers.List[i])
 		} else if(localState.Optimistic != &localState.Peers.List[i]) {
 			localState.Peers.List[i].UpdateChoking(true)

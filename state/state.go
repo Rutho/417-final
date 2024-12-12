@@ -311,9 +311,9 @@ func (s State) PrintTop4() {
 
 	for i, peer := range s.Top4 {
 		if i == 0 {
-			output += fmt.Sprintf("%s uploadSpeed:%.2f", peer, peer.Upload_speed)
+			output += fmt.Sprintf("%s", peer)
 		} else {
-			output += fmt.Sprintf("\n, %s", peer)
+			output += fmt.Sprintf(",\n %s", peer)
 		}
 	}
 	output += "]\n"
