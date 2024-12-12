@@ -92,7 +92,7 @@ func main() {
 	// Store the peer list into the State struct
 	// --------
 
-	s := comms.NewServer(localState.Port, 2048, localState.ID, localState.Info_hash)
+	s := comms.NewServer(localState.IP, localState.Port, 2048, localState.ID, localState.Info_hash)
 	go s.Start()
 
 	peerMsgCh := make(chan comms.Message, 50)
@@ -315,6 +315,11 @@ func main() {
 				localState.PeersLock.Lock()
 				localState.Peers.List = append(localState.Peers.List, connectedPeer) //deep copy
 				localState.PeersLock.Unlock()
+				go func(peer peer.Peer) {
+					for _, b := range localState.Bitmap.Complete() {
+						connectedPeer.Connection.SendHave(uint32(b.Index))
+					}
+				}(connectedPeer)
 				go func() {
 					err := s.ReadLoop(connectedPeer.Connection)
 					if err != nil {

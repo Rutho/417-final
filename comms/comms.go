@@ -73,9 +73,9 @@ const (
 )
 
 // Initializes a server instance and returns a pointer to it
-func NewServer(localPort int, maxPktSize uint32, serverId string, infoHash []byte) *Server {
+func NewServer(localAddress net.IP, localPort int, maxPktSize uint32, serverId string, infoHash []byte) *Server {
 	return &Server{
-		localAddress:    net.ParseIP("127.0.0.1"),
+		localAddress:    localAddress,
 		localPort:       localPort,
 		quitCh:          make(chan struct{}),
 		MsgCh:           make(chan Message, 50),
