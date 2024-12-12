@@ -234,7 +234,7 @@ func (s *State) SendARequest() bool {
 	}
 
 	if len(s.RequestQueue) >= request.QueueSize {
-		fmt.Println("Tried to SendARequest() but the queue was full")
+		// fmt.Println("Tried to SendARequest() but the queue was full")
 		return false
 	}
 
