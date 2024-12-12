@@ -34,13 +34,13 @@ type State struct {
 	IP           net.IP
 	Port         int
 	ID           string
-	PeersLock    sync.RWMutex
+	PeersLock    *sync.RWMutex
 	Peers        peer.Peers
-	Top4Lock     sync.RWMutex
+	Top4Lock     *sync.RWMutex
 	Top4         []*peer.Peer
-	BitmapLock   sync.RWMutex
+	BitmapLock   *sync.RWMutex
 	Bitmap       bitmap.Bitmap
-	RequestLock  sync.RWMutex
+	RequestLock  *sync.RWMutex
 	RequestQueue []request.Request
 	PieceHashes  []byte
 	PieceLength  int64
@@ -263,8 +263,8 @@ func (s *State) SendARequest() bool {
 
 	// Make a new request
 	r := new(request.Request)
-	r.Block     = block
-	r.Peer      = peer
+	r.Block = block
+	r.Peer = peer
 	r.Cancelled = false
 	r.Timestamp = time.Now().Unix()
 	r.Request_lock = new(sync.RWMutex)

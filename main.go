@@ -25,6 +25,7 @@ import (
 	"math/rand"
 	"net"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -34,7 +35,10 @@ func main() {
 
 	// Create a State object
 	var localState state.State
-
+	localState.PeersLock = new(sync.RWMutex)
+	localState.BitmapLock = new(sync.RWMutex)
+	localState.RequestLock = new(sync.RWMutex)
+	localState.Top4Lock = new(sync.RWMutex)
 	// Parse command line arguments
 	localState.ParseClargs()
 
@@ -83,7 +87,7 @@ func main() {
 	localState.Info_hash = request_info.Info_hash
 
 	// Client starts off as leecher
-	localState.Seeder = false;
+	localState.Seeder = false
 
 	// Store the peer list into the State struct
 	// --------
@@ -158,8 +162,9 @@ func main() {
 				peer.UpdatePeerChoking(true)
 			case comms.Unchoke:
 				peer.UpdatePeerChoking(false)
+				localState.PeersLock.RLock()
 				p := localState.Peers.FindPeerByID(msg.PeerId)
-
+				localState.PeersLock.RUnlock()
 				// add to Top 4
 				if len(localState.Top4) < 4 && !contains(localState.Top4, p) {
 					localState.Top4 = append(localState.Top4, p)
@@ -318,7 +323,9 @@ func main() {
 				return
 			}
 			fmt.Printf("peerID: %s\n", peerId)
+			peer.Bitmap_lock.Lock()
 			peer.Bitmap.New(localState.PieceHashes, localState.PieceLength, localState.FileSize)
+			peer.Bitmap_lock.Unlock()
 			peer.Connection = conn
 			peer.Peer_id = peerId
 			establishCh <- peer
@@ -436,7 +443,9 @@ func main() {
 						return
 					}
 					peer.New = true
+					peer.Bitmap_lock.Lock()
 					peer.Bitmap.New(localState.PieceHashes, localState.PieceLength, localState.FileSize)
+					peer.Bitmap_lock.Unlock()
 					peer.Connection = conn
 					peer.Peer_id = peerId
 					establishCh <- peer
@@ -469,7 +478,7 @@ func OptimisticUnchoking(localState *state.State) {
 			p := &localState.Peers.List[i]
 
 			if !contains(localState.Top4, p) {
-				if(localState.Seeder) {
+				if localState.Seeder {
 					p.Peer_interested_lock.RLock()
 					if p.Am_interested {
 						peers = append(peers, p)
@@ -504,8 +513,8 @@ func OptimisticUnchoking(localState *state.State) {
 		// Set uploaded bytes to 0 for next cycle
 		for i := range localState.Peers.List {
 			p := &localState.Peers.List[i]
-			if(localState.Seeder) {
-				p.Downloaded_bytes = 0;
+			if localState.Seeder {
+				p.Downloaded_bytes = 0
 			} else {
 				p.Uploaded_bytes = 0
 			}
@@ -518,7 +527,7 @@ func OptimisticUnchoking(localState *state.State) {
 // sort the peers based on upload/download speed and update the top 4
 func SortPeersAndUpdateTop4(localState *state.State) {
 	var newTop4 []*peer.Peer
-	if(localState.Seeder) {
+	if localState.Seeder {
 		// Sort the peers in descending order of download speed. Latest unchoked peer may be a replacement
 		sort.SliceStable(localState.Peers.List, func(i, j int) bool {
 			return (localState.Peers.List)[i].Downloaded_bytes > (localState.Peers.List)[j].Downloaded_bytes
