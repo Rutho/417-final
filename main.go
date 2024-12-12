@@ -208,14 +208,14 @@ func main() {
 
 					p := localState.Peers.FindPeerByID(msg.PeerId)
 
-					fmt.Printf("GOT Piece %d %d\n", pieceIdx, pieceOffset)
+					// fmt.Printf("GOT Piece %d %d\n", pieceIdx, pieceOffset)
 
 					ok := receive.Process(&localState, pieceIdx, int64(pieceOffset), buf)
 					if !ok { // something went wrong (e.g. incorrect hash)
 						break
 					}
 
-					fmt.Printf("after Process(): GOT Piece %d %d\n", pieceIdx, pieceOffset)
+					// fmt.Printf("after Process(): GOT Piece %d %d\n", pieceIdx, pieceOffset)
 
 					p.Uploaded_bytes += int64(len(buf))
 /*
@@ -335,26 +335,14 @@ func main() {
 	requestQueueCleanerTicker := time.NewTicker(1 * time.Second)
 	go func() {
 		for range requestQueueCleanerTicker.C {
-
-			// fmt.Println("Cleaner: waiting lock")
-			// localState.RequestLock.Lock()
-			// fmt.Println("Cleaner: got lock")
-
-			var reqs_to_keep []int
-			for i, r := range localState.RequestQueue {
-				// Compare
-				if time.Now().Unix() - r.Timestamp > 5 {
-					localState.RequestQueue[i].Clean(&localState.Bitmap)
-				} else {
-					reqs_to_keep = append(reqs_to_keep, i)
+			// Iterate in reverse to safely remove items
+			for i := len(localState.RequestQueue) - 1; i >= 0; i-- {
+				if time.Now().Unix() - localState.RequestQueue[i].Timestamp > 5 {
+				// Remove the item by replacing it with the last item and reslicing
+				localState.RequestQueue[i] = localState.RequestQueue[len(localState.RequestQueue)-1]
+				localState.RequestQueue = localState.RequestQueue[:len(localState.RequestQueue)-1]
 				}
 			}
-			for i, j := range reqs_to_keep {
-				localState.RequestQueue[i] = localState.RequestQueue[j]
-			}
-			// fmt.Println("Cleaner: releasing lock")
-			// localState.RequestLock.Unlock()
-
 		}
 	}()
 
