@@ -319,7 +319,7 @@ func main() {
 	time.Sleep(20000000000)
 
 	// Goroutine to send requests for pieces, until entire file is received
-	requestTicker := time.NewTicker(100000000) // 0.1 sec
+	requestTicker := time.NewTicker(50000000) // 0.05 sec
 	go func() {
 		for range requestTicker.C {
 			if localState.SendARequest() {
@@ -338,9 +338,11 @@ func main() {
 			// Iterate in reverse to safely remove items
 			for i := len(localState.RequestQueue) - 1; i >= 0; i-- {
 				if time.Now().Unix() - localState.RequestQueue[i].Timestamp > 5 {
-				// Remove the item by replacing it with the last item and reslicing
-				localState.RequestQueue[i] = localState.RequestQueue[len(localState.RequestQueue)-1]
-				localState.RequestQueue = localState.RequestQueue[:len(localState.RequestQueue)-1]
+					localState.RequestQueue[i].Clean(&localState.Bitmap)
+
+					// Remove the item by replacing it with the last item and reslicing
+					localState.RequestQueue[i] = localState.RequestQueue[len(localState.RequestQueue)-1]
+					localState.RequestQueue = localState.RequestQueue[:len(localState.RequestQueue)-1]
 				}
 			}
 		}
