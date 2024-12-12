@@ -255,18 +255,17 @@ func (s *State) SendARequest() bool {
 		min = s.Bitmap.Pieces[piece_index].Length - s.Bitmap.Pieces[piece_index].Pending
 	}
 
-	// Make a new block
-	b := new(bitmap.Block)
-	b.PieceIndex = piece_index
-	b.Offset = s.Bitmap.Pieces[piece_index].Pending
-	b.Length = min
-	b.Block_lock = new(sync.RWMutex)
+	if min == 0 {
+		fmt.Println("[ERROR] Can't request a block of size zero!")
+		return false
+	}
 
-	b.Complete = false
-	b.Incomplete = true
+	// Make a new block
+	var b bitmap.Block
+	b.New(piece_index, s.Bitmap.Pieces[piece_index].Pending, min)
 
 	// Add the block to the piece
-	s.Bitmap.Pieces[piece_index].Blocks = append(s.Bitmap.Pieces[piece_index].Blocks, *b)
+	s.Bitmap.Pieces[piece_index].Blocks = append(s.Bitmap.Pieces[piece_index].Blocks, b)
 
 	// Increase pending bytes
 	s.Bitmap.Pieces[piece_index].Pending += b.Length
@@ -284,7 +283,7 @@ func (s *State) SendARequest() bool {
 
 	peer.Connection.SendRequest(uint32(piece_index), uint32(b.Offset), uint32(b.Length))
 
-	// fmt.Printf("REQUEST Piece %d\n", piece_index)
+	fmt.Printf("REQUEST %s\n", r.Block)
 	return false
 }
 

@@ -194,10 +194,10 @@ func main() {
 					if localState.Bitmap.AllDownloaded() {
 						break // ignore the piece
 					}
-					// If we have the piece
-					if localState.Bitmap.Pieces[int(pieceIdx)].PendingComplete() {
-						break // ignore the piece
-					}
+					// // If we have the piece
+					// if localState.Bitmap.Pieces[int(pieceIdx)].PendingComplete() {
+					// 	break // ignore the piece
+					// }
 
 					//TODO: Update Peer's upload rate
 					//Either peer is sending us stuff willy-nilly or piece was completed
@@ -209,15 +209,17 @@ func main() {
 
 					p := localState.Peers.FindPeerByID(msg.PeerId)
 
+					fmt.Printf("GOT Piece %d %d\n", pieceIdx, pieceOffset)
+
 					ok := receive.Process(&localState, pieceIdx, int64(pieceOffset), buf)
 					if !ok { // something went wrong (e.g. incorrect hash)
 						break
 					}
 
-					// fmt.Printf("GOT Piece %d\n", pieceIdx)
+					fmt.Printf("after Process(): GOT Piece %d %d\n", pieceIdx, pieceOffset)
 
 					p.Uploaded_bytes += int64(len(buf))
-
+/*
 					// Write to the file
 					f.WritePieceOffset(pieceIdx, int(pieceLength), pieceOffset, buf)
 
@@ -247,7 +249,7 @@ func main() {
 					} else {
 						p.UpdateInterested(false)
 						p.Connection.SendNotInterested()
-					}
+					}*/
 				case comms.Request:
 					peer := localState.Peers.FindPeerByID(msg.PeerId)
 					if !localState.Bitmap.Pieces[int(pieceIdx)].Complete() || peer.Am_choking {
@@ -337,7 +339,7 @@ func main() {
 			var reqs_to_keep []int
 			for i, r := range localState.RequestQueue {
 				// Compare
-				if time.Now().Unix() - r.Timestamp > 5 {
+				if time.Now().Unix() - r.Timestamp > 15 {
 					localState.RequestQueue[i].Clean(&localState.Bitmap)
 				} else {
 					reqs_to_keep = append(reqs_to_keep, i)

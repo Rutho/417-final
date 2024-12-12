@@ -118,7 +118,7 @@ func (b Bitmap) String() string {
 			output += "0"
 		}
 		if i > 80 {
-			output += fmt.Sprintf("...] (%d/%d)", len(b.PendingComplete()), len(b.Pieces))
+			output += fmt.Sprintf("...] (%d/%d)", len(b.Complete()), len(b.Pieces))
 			return output
 		}
 	}
@@ -443,14 +443,14 @@ func (b *Bitmap) PendingIncomplete() []Piece {
 
 func (b *Bitmap) InProgress() []Piece {
 	// Description:
-	//    Returns a list of Pieces that have at least 1 block downloaded
+	//    Returns a list of Pieces that have at least 1 block downloaded but not completely done
 
 	b.Pieces_lock.RLock()
 	defer b.Pieces_lock.RUnlock()
 
 	var output []Piece
 	for i := 0; i < len(b.Pieces); i++ {
-		if len(b.Pieces[i].Blocks) > 0 {
+		if len(b.Pieces[i].Blocks) > 0 && b.Pieces[i].PendingIncomplete() {
 			output = append(output, b.Pieces[i])
 		}
 	}
@@ -536,7 +536,7 @@ func (b *Block) New(idx int, offset int64, length int64) {
 	b.Incomplete = true
 }
 
-func (b *Block) String() {
+func (b Block) String() string {
 	return fmt.Sprintf("<%d %d %d>", b.PieceIndex, b.Offset, b.Length)
 }
 

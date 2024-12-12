@@ -8,7 +8,7 @@ import (
 )
 
 const MaxBlockSize = 16384 // Maximum block size, in bytes
-const QueueSize    = 10    // How many pending requests can be in flight at once
+const QueueSize    = 50    // How many pending requests can be in flight at once
 
 type Request struct {
 	// Description:
@@ -78,7 +78,7 @@ func SelectPiece(p *peer.Peer, self *bitmap.Bitmap) int {
 	// just pick any piece
 
 	// Get the pieces that the local client needs
-	my_bitmap    := self.PendingIncomplete()
+	my_bitmap    := self.Incomplete()
 
 	// Get the intersection of each list
 	intersection = nil
