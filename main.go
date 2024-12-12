@@ -502,6 +502,7 @@ func OptimisticUnchoking(localState *state.State) {
 		optimisticPeer := interested_peers[weightedRandomChoice(interested_peers)]
 		optimisticPeer.UpdateChoking(false)
 		optimisticPeer.Connection.SendUnchoke()
+		localState.Optimistic = optimisticPeer
 		fmt.Printf("Unchoked: %s:%d\n", optimisticPeer.Ip, optimisticPeer.Port)
 
 		// Set uploaded bytes to 0 for next cycle
@@ -528,11 +529,11 @@ func SortPeersAndUpdateTop4(localState *state.State) {
 			break
 		}
 
-		localState.Peers.List[i].Am_choking_lock.RLock()
 		localState.Peers.List[i].Peer_interested_lock.RLock()
 		localState.Peers.List[i].Peer_choking_lock.RLock()
 
 		if localState.Peers.List[i].Peer_interested || !localState.Peers.List[i].Peer_choking {
+			localState.Peers.List[i].Am_choking_lock.RLock()
 			if localState.Peers.List[i].Am_choking {
 				localState.Peers.List[i].Am_choking_lock.RUnlock()
 				localState.Peers.List[i].UpdateChoking(false)
@@ -543,6 +544,8 @@ func SortPeersAndUpdateTop4(localState *state.State) {
 
 			fmt.Println("appending")
 			newTop4 = append(newTop4, &localState.Peers.List[i])
+		} else if(localState.Optimistic != &localState.Peers.List[i]) {
+			localState.Peers.List[i].UpdateChoking(true)
 		}
 		localState.Peers.List[i].Peer_choking_lock.RUnlock()
 		localState.Peers.List[i].Peer_interested_lock.RUnlock()

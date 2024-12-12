@@ -47,7 +47,8 @@ type State struct {
 	FileSize     int64
 	NumPieces    int
 	Info_hash    []byte
-	RN int
+	RN 			 int
+	Optimistic   *peer.Peer
 }
 
 func (s State) String() string {
