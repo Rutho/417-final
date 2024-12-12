@@ -25,7 +25,6 @@ import (
 	"math/rand"
 	"net"
 	"sort"
-	"sync"
 	"time"
 )
 
@@ -382,7 +381,6 @@ func main() {
 	*/
 	// Tickers for periodic tasks
 	optimisticUnchokingTicker := time.NewTicker(30 * time.Second)
-	calculateUploadRateTicker := time.NewTicker(10 * time.Second)
 
 	printLocalStateTicker := time.NewTicker(30 * time.Second)
 	var sendTrackerRequestTicker *time.Ticker
@@ -418,12 +416,6 @@ func main() {
 			// Lock and perform optimistic unchoking
 			OptimisticUnchoking(&localState)
 
-		case <-calculateUploadRateTicker.C:
-			fmt.Println("CalculateUploadRate()")
-			// Lock and calculate upload rates
-			localState.PeersLock.RLock()
-			CalculateUploadRate(&localState)
-			localState.PeersLock.RUnlock()
 		case <-printLocalStateTicker.C:
 			localState.PeersLock.RLock()
 			fmt.Println(localState)
@@ -505,8 +497,11 @@ func OptimisticUnchoking(localState *state.State) {
 		optimisticPeer.Connection.SendUnchoke()
 		fmt.Printf("Unchoked: %s:%d\n", optimisticPeer.Ip, optimisticPeer.Port)
 
-		// print top4
-		localState.PrintTop4()
+		// Set uploaded bytes to 0 for next cycle
+		for i := range localState.Peers.List {
+			p := &localState.Peers.List[i]
+			p.Uploaded_bytes = 0
+		}
 	} else {
 		fmt.Println("Not enough peers for optimistic unchoking")
 	}
@@ -559,27 +554,6 @@ func contains(top_four []*peer.Peer, p *peer.Peer) bool {
 		}
 	}
 	return false
-}
-
-func CalculateUploadRate(localState *state.State) {
-	var wg sync.WaitGroup
-	for i := range localState.Peers.List {
-		wg.Add(1)
-		go func(p *peer.Peer) {
-			defer wg.Done()
-			time_elapsed := time.Now().UnixNano() - p.Last_time_updated
-			p.Last_time_updated = time.Now().UnixNano()
-			if time_elapsed == 0 {
-				fmt.Println("Time elapsed is 0")
-				p.Uploaded_bytes = 0
-				return
-			}
-			upload_speed := float64(p.Uploaded_bytes) / float64(time_elapsed)
-			p.Upload_speed = upload_speed
-			p.Uploaded_bytes = 0
-		}(&localState.Peers.List[i])
-	}
-	wg.Wait()
 }
 
 // Assigns a weight to each interested peer. New peers are 3x more likely to be chosen
