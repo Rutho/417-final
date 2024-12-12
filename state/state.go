@@ -129,12 +129,11 @@ func (s *State) ParseClargs() {
 
 	// Define -p <port number>
 	// Default value 8080 (BitTorrent typically uses 6881-6889, and 6969 for tracker)
-	port := flag.Int("p", 8080, "port of host")
+	s.Port = *flag.Int("p", 8080, "port of host")
 
 	// Parse the command line into the defined flags
 	flag.Parse()
 	s.TorrentFile = *t
-	s.Port = *port
 }
 
 func (s *State) GenerateID() string {
@@ -226,7 +225,6 @@ func (s *State) SendARequest() bool {
 
 	s.PeersLock.Lock()
 	s.BitmapLock.Lock()
-
 	defer s.PeersLock.Unlock()
 	defer s.BitmapLock.Unlock()
 
@@ -242,7 +240,6 @@ func (s *State) SendARequest() bool {
 	}
 
 	peer := request.SelectPeer(&s.Peers)
-
 	if peer == nil {
 		fmt.Println("Tried to SendARequest() but no peer was found!")
 		return false
@@ -250,32 +247,19 @@ func (s *State) SendARequest() bool {
 
 	piece_index := request.SelectPiece(peer, &s.Bitmap)
 
-	// The last block may be smaller in size
-	var min int64
-	if request.MaxBlockSize < s.Bitmap.Pieces[piece_index].Length-s.Bitmap.Pieces[piece_index].Pending {
-		min = request.MaxBlockSize
-	} else {
-		min = s.Bitmap.Pieces[piece_index].Length - s.Bitmap.Pieces[piece_index].Pending
+	block := request.SelectBlock(&s.Bitmap.Pieces[piece_index])
+	if block == nil {
+		fmt.Println("Tried to SendARequest() for a completed piece??")
+		return false
 	}
-
-	if min == 0 {
-		panic("Can't request a block of size zero!")
-	}
-
-	// Make a new block
-	var b bitmap.Block
-	b.New(piece_index, s.Bitmap.Pieces[piece_index].Pending, min)
-
-	// Add the block to the piece
-	s.Bitmap.Pieces[piece_index].Blocks = append(s.Bitmap.Pieces[piece_index].Blocks, b)
 
 	// Increase pending bytes
-	s.Bitmap.Pieces[piece_index].Pending += b.Length
+	s.Bitmap.Pieces[piece_index].Pending += block.Length
 
 	// Make a new request
 	r := new(request.Request)
-	r.Block = &s.Bitmap.Pieces[piece_index].Blocks[len(s.Bitmap.Pieces[piece_index].Blocks)-1]
-	r.Peer = peer
+	r.Block     = block
+	r.Peer      = peer
 	r.Cancelled = false
 	r.Timestamp = time.Now().Unix()
 	r.Request_lock = new(sync.RWMutex)
@@ -283,7 +267,7 @@ func (s *State) SendARequest() bool {
 	// Add the request to the queue
 	s.RequestQueue = append(s.RequestQueue, *r)
 
-	peer.Connection.SendRequest(uint32(piece_index), uint32(b.Offset), uint32(b.Length))
+	peer.Connection.SendRequest(uint32(piece_index), uint32(block.Offset), uint32(block.Length))
 
 	// fmt.Printf("REQUEST %d\n", piece_index)
 	// fmt.Printf("REQUEST %s\n", r.Block)

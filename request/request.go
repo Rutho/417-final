@@ -31,6 +31,23 @@ type Request struct {
 	Request_lock *sync.RWMutex
 }
 
+func SelectBlock(p *bitmap.Piece) *bitmap.Block {
+	// Description:
+	//
+	//   TODO
+	//
+	// Returns:
+	//
+	//   a pointer to the block
+
+	for i := range p.Blocks {
+		if p.Blocks[i].Incomplete {
+			return &p.Blocks[i]
+		}
+	}
+	return nil
+}
+
 func SelectPiece(p *peer.Peer, self *bitmap.Bitmap) int {
 	// Description:
 	//

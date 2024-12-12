@@ -41,14 +41,14 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	// Update the piece
 	piece.Progress += int64(len(buf))
 
-	// for _, b := range s.Bitmap.Pieces[piece_index].Blocks {
-	// 	fmt.Printf("%s ", b)
-	// }
-	// fmt.Printf("\n")
-
 	// Check the hash of the piece if it's complete
 	ok := true
 	if piece.Complete() {
+		fmt.Printf("Piece %d fully downloaded, verifying hash...\n", piece_index)
+		for _, b := range s.Bitmap.Pieces[piece_index].Blocks {
+			fmt.Printf("%s ", b)
+		}
+		fmt.Printf("\n")
 		ok = VerifyPieceHash(s, Aggregate(piece), piece_index)
 		if !ok {
 			// Reset the piece
