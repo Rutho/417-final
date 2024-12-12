@@ -100,6 +100,31 @@ func main() {
 	establishCh := make(chan peer.Peer, 30)
 	disconnectCh := &s.DisconnectCh
 
+	go func() {
+		for {
+			conn := <-s.ConnEstablishCh
+			peer := new(peer.Peer)
+			peer.Am_choking = true
+			peer.Am_interested = false
+			peer.Peer_choking = true
+			peer.Peer_interested = false
+			peer.Peer_id = conn.PeerId
+			peer.Am_choking_lock = new(sync.RWMutex)
+			peer.Bitmap_lock = new(sync.RWMutex)
+			peer.Bitmap.New(localState.PieceHashes, localState.PieceLength, localState.FileSize)
+			peer.Am_interested_lock = new(sync.RWMutex)
+			peer.Connection = conn
+			peer.Downloaded_bytes = 0
+			peer.Peer_interested_lock = new(sync.RWMutex)
+			peer.Port = conn.PeerPort
+			peer.Ip = conn.PeerAddress
+			peer.Uploaded_bytes = 0
+			peer.Top4_lock = new(sync.RWMutex)
+			peer.New = true
+			establishCh <- *peer
+		}
+	}()
+
 	//Message Filtering
 	//Filters peer-specific messages to peerMsgCh and
 	//messages that require local state to stateMsgCh
@@ -205,7 +230,6 @@ func main() {
 					if localState.Seeder {
 						break // ignore the piece
 					}
-
 
 					//TODO: Update Peer's upload rate
 					//Either peer is sending us stuff willy-nilly or piece was completed

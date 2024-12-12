@@ -42,9 +42,9 @@ type Piece struct {
 	FileOffset int64
 	Piece_lock *sync.RWMutex
 
-	Blocks     []Block
-	Progress   int64
-	Pending    int64
+	Blocks   []Block
+	Progress int64
+	Pending  int64
 }
 
 type Block struct {
@@ -70,7 +70,7 @@ type Block struct {
 	Length     int64
 	Block_lock *sync.RWMutex
 
-	Buf        []byte
+	Buf []byte
 
 	Complete   bool
 	Pending    bool
@@ -131,7 +131,6 @@ func (b Bitmap) String() string {
 	return output + "]"
 }
 
-
 func (b *Bitmap) New(hashes []byte, piece_len int64, file_len int64) {
 	// Description:
 	//
@@ -162,13 +161,13 @@ func (b *Bitmap) New(hashes []byte, piece_len int64, file_len int64) {
 
 	// Make pieces
 	idx := 0
-	hash_offset := 0 // how many bytes into hashes we are currently at
+	hash_offset := 0          // how many bytes into hashes we are currently at
 	var file_offset int64 = 0 // how many bytes into the file we are currently at
 	for hash_offset < len(hashes) {
 
 		// The last piece may be smaller in size
 		var min int64
-		if file_offset + piece_len <= file_len {
+		if file_offset+piece_len <= file_len {
 			min = piece_len
 		} else {
 			min = file_len - file_offset
@@ -339,7 +338,7 @@ func (b *Bitmap) Compress() ([]byte, int) {
 	for i := 0; i < length; i++ {
 		if b.Bitmap()[i] {
 			placedByte := i / 8
-			bitInByte := i - placedByte
+			bitInByte := i - (8 * placedByte)
 			compressedBitfield[placedByte] = compressedBitfield[placedByte] | (1 << (8 - (bitInByte + 1)))
 		}
 	}
@@ -361,7 +360,7 @@ func (b *Bitmap) HasExtraPieces(b2 *Bitmap) (bool, error) {
 	// defer b2.Pieces_lock.RUnlock()
 	// for i := 0; i < bitmapSize; i++ {
 	// 	// fmt.Printf("%t == %t\n", bitmap[i], b2_bitmap[i])
- //
+	//
 	// 	if bitmap[i] == false && b2_bitmap[i] == true {
 	// 		fmt.Println("Peer has pieces that I need")
 	// 		return true, nil
@@ -380,7 +379,6 @@ func (b *Bitmap) HasExtraPieces(b2 *Bitmap) (bool, error) {
 	}
 	return false, nil
 }
-
 
 func (b *Bitmap) Complete() []Piece {
 	// Description:
@@ -519,8 +517,6 @@ func (p *Piece) PendingIncomplete() bool {
 	return p.Pending < p.Length
 }
 
-
-
 func (a *Block) Equals(b *Block) bool {
 	// Description:
 	//
@@ -558,12 +554,12 @@ func (b *Block) New(idx int, offset int64, length int64) {
 	//   TODO
 
 	b.PieceIndex = idx
-	b.Offset     = offset
-	b.Length     = length
+	b.Offset = offset
+	b.Length = length
 	b.Block_lock = new(sync.RWMutex)
-	b.Buf        = nil
-	b.Complete   = false
-	b.Pending    = false
+	b.Buf = nil
+	b.Complete = false
+	b.Pending = false
 	b.Incomplete = true
 }
 
@@ -573,26 +569,25 @@ func (b Block) String() string {
 
 func (p *Piece) Reset() {
 	for i := range p.Blocks {
-		p.Blocks[i].Buf        = nil
-		p.Blocks[i].Complete   = false
-		p.Blocks[i].Pending    = false
+		p.Blocks[i].Buf = nil
+		p.Blocks[i].Complete = false
+		p.Blocks[i].Pending = false
 		p.Blocks[i].Incomplete = true
 	}
 	p.Progress = 0
-	p.Pending  = 0
+	p.Pending = 0
 }
 
 func (p *Piece) New(idx int, length int64, hash []byte, file_offset int64) {
-	p.Index      = idx
-	p.Length     = length
-	p.Hash       = hash
+	p.Index = idx
+	p.Length = length
+	p.Hash = hash
 	p.FileOffset = file_offset
 	p.Piece_lock = new(sync.RWMutex)
 
-	p.Blocks     = nil
-	p.Progress   = 0
-	p.Pending    = 0
-
+	p.Blocks = nil
+	p.Progress = 0
+	p.Pending = 0
 
 	// Take the length and divide it into block sizes
 	var offset int64 = 0
@@ -602,7 +597,7 @@ func (p *Piece) New(idx int, length int64, hash []byte, file_offset int64) {
 		var b Block
 		var curr_b_len int64
 
-		if tlen - 16384 > 0 {
+		if tlen-16384 > 0 {
 			curr_b_len = 16384
 		} else {
 			curr_b_len = tlen
@@ -615,4 +610,3 @@ func (p *Piece) New(idx int, length int64, hash []byte, file_offset int64) {
 		tlen -= curr_b_len
 	}
 }
-

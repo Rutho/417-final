@@ -14,15 +14,16 @@ import (
 )
 
 type Server struct {
-	localAddress net.IP
-	localPort    int
-	ln           net.Listener
-	quitCh       chan struct{}
-	MsgCh        chan Message
-	DisconnectCh chan string
-	maxPktSize   uint32
-	serverId     string
-	infoHash     []byte
+	localAddress    net.IP
+	localPort       int
+	ln              net.Listener
+	quitCh          chan struct{}
+	MsgCh           chan Message
+	DisconnectCh    chan string
+	ConnEstablishCh chan *ConnectionState
+	maxPktSize      uint32
+	serverId        string
+	infoHash        []byte
 }
 
 type Packet struct {
@@ -74,14 +75,15 @@ const (
 // Initializes a server instance and returns a pointer to it
 func NewServer(localPort int, maxPktSize uint32, serverId string, infoHash []byte) *Server {
 	return &Server{
-		localAddress: net.ParseIP("127.0.0.1"),
-		localPort:    localPort,
-		quitCh:       make(chan struct{}),
-		MsgCh:        make(chan Message, 50),
-		DisconnectCh: make(chan string, 40),
-		maxPktSize:   maxPktSize,
-		serverId:     serverId,
-		infoHash:     infoHash,
+		localAddress:    net.ParseIP("127.0.0.1"),
+		localPort:       localPort,
+		quitCh:          make(chan struct{}),
+		MsgCh:           make(chan Message, 50),
+		DisconnectCh:    make(chan string, 40),
+		ConnEstablishCh: make(chan *ConnectionState, 20),
+		maxPktSize:      maxPktSize,
+		serverId:        serverId,
+		infoHash:        infoHash,
 	}
 }
 
@@ -169,17 +171,12 @@ func (s *Server) acceptLoop() {
 			//peer.Peer.
 			//Handle Peers connecting to us
 			if err == nil {
-				go func() {
-					err := s.ReadLoop(conn)
-					if err != nil {
-						s.DisconnectCh <- conn.PeerId
-					}
-				}()
+				s.ConnEstablishCh <- conn
+			} else {
+				(*conn.Conn).Close()
 			}
-
 		}()
 	}
-
 }
 
 // Reads packets received from the given connection
