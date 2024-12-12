@@ -162,7 +162,7 @@ func (b *Bitmap) New(hashes []byte, piece_len int64, file_len int64) {
 
 		// The last piece may be smaller in size
 		var min int64
-		if piece_len < file_len - file_offset {
+		if file_offset + piece_len <= file_len {
 			min = piece_len
 		} else {
 			min = file_len - file_offset
@@ -524,7 +524,9 @@ func (b *Block) New(idx int, offset int64, length int64) {
 	//
 	// Parameters:
 	//
-	//   TODO
+	//   idx    : index of the piece that this block belongs to
+	//   offset : how many bytes into the piece
+	//   length : how many bytes long this block is
 	//
 	// Returns:
 	//
@@ -548,7 +550,11 @@ func (b Block) String() string {
 }
 
 func (p *Piece) Reset() {
-	p.Blocks   = nil
+	for i := range p.Blocks {
+		p.Blocks.Buf        = nil
+		p.Blocks.Complete   = false
+		p.Blocks.Incomplete = true
+	}
 	p.Progress = 0
 	p.Pending  = 0
 }
@@ -566,7 +572,7 @@ func (p *Piece) New(idx int, length int64, hash []byte, file_offset int64) {
 
 
 	// Take the length and divide it into block sizes
-	var offset int64
+	var offset int64 = 0
 	tlen := p.Length
 
 	for tlen > 0 {
