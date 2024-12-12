@@ -47,6 +47,7 @@ type State struct {
 	FileSize     int64
 	NumPieces    int
 	Info_hash    []byte
+	Optimistic   *peer.Peer
 }
 
 func (s State) String() string {
@@ -309,9 +310,9 @@ func (s State) PrintTop4() {
 
 	for i, peer := range s.Top4 {
 		if i == 0 {
-			output += fmt.Sprintf("%s uploaded Bytes:%d", peer, peer.Uploaded_bytes)
+			output += fmt.Sprintf("%s", peer)
 		} else {
-			output += fmt.Sprintf("\n, %s", peer)
+			output += fmt.Sprintf(",\n %s", peer)
 		}
 	}
 	output += "]\n"
