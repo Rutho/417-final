@@ -16,6 +16,7 @@ import (
 	"client/filemanager"
 	"client/peer"
 	"client/request"
+	"client/receive"
 	"client/state"
 	"encoding/binary"
 	"fmt"
@@ -188,40 +189,53 @@ func main() {
 				pieceOffset := int(binary.BigEndian.Uint32(msg.Payload[4:8]))
 				switch msg.MsgType {
 				case comms.Piece:
+					// If we have all the pieces
 					if localState.Bitmap.AllDownloaded() {
 						break // ignore the piece
 					}
+					// If we have the piece
+					if localState.Bitmap.Pieces[int(pieceIdx)].PendingComplete() {
+						break // ignore the piece
+					}
+
 					//TODO: Update Peer's upload rate
 					//Either peer is sending us stuff willy-nilly or piece was completed
 					//between the time we sent a request message to this peer and we received the piece message from this peer
 					//Latter case only happens if we're sending multiple requests for the same block to different peers
 					//Should we include these messages for the calculation of peer's upload rate then? YES
-					p := localState.Peers.FindPeerByID(msg.PeerId)
-					fmt.Printf("Received a Piece from %s\n", p)
-					if localState.Bitmap.Pieces[int(pieceIdx)].Incomplete() {
-						buf := msg.Payload[8:]
-						p.Uploaded_bytes += int64(len(buf))
-						fmt.Printf("added piece: %s", p)
 
-						f.WritePieceOffset(pieceIdx, int(pieceLength), pieceOffset, buf)
-						if f.IsPieceDownloaded(pieceIdx, int(pieceLength)) {
-							localState.Bitmap.MarkPiece(int(pieceIdx))
-							localState.PeersLock.Lock()
-							for i := range localState.Peers.List {
-								localState.Peers.List[i].Connection.SendHave(pieceIdx)
-								go func(p *peer.Peer) {
-									extra, _ := localState.Bitmap.HasExtraPieces(&p.Bitmap)
-									if !extra && p.Peer_interested {
-										p.UpdateInterested(false)
-										p.Connection.SendNotInterested()
-									} else if extra && !p.Peer_interested {
-										p.UpdateInterested(true)
-										p.Connection.SendInterested()
-									}
-								}(&localState.Peers.List[i])
-							}
-							localState.PeersLock.Unlock()
+					buf := msg.Payload[8:]
+
+					p := localState.Peers.FindPeerByID(msg.PeerId)
+
+					ok := receive.Process(&localState, pieceIdx, int64(pieceOffset), buf)
+					if !ok { // something went wrong (e.g. incorrect hash)
+						break
+					}
+
+					// fmt.Printf("GOT Piece %d\n", pieceIdx)
+
+					p.Uploaded_bytes += int64(len(buf))
+
+					// Write to the file
+					f.WritePieceOffset(pieceIdx, int(pieceLength), pieceOffset, buf)
+
+					if f.IsPieceDownloaded(pieceIdx, int(pieceLength)) {
+						localState.PeersLock.Lock()
+						for i := range localState.Peers.List {
+							localState.Peers.List[i].Connection.SendHave(pieceIdx)
+							go func(p *peer.Peer) {
+								extra, _ := localState.Bitmap.HasExtraPieces(&p.Bitmap)
+								if !extra && p.Peer_interested {
+									p.UpdateInterested(false)
+									p.Connection.SendNotInterested()
+								} else if extra && !p.Peer_interested {
+									p.UpdateInterested(true)
+									p.Connection.SendInterested()
+								}
+							}(&localState.Peers.List[i])
 						}
+						localState.PeersLock.Unlock()
 					}
 					extra, _ := localState.Bitmap.HasExtraPieces(&p.Bitmap)
 					if extra {
@@ -301,8 +315,9 @@ func main() {
 	}
 
 	time.Sleep(20000000000)
-	//Separate goroutine to send requests for pieces
-	requestTicker := time.NewTicker(1 * time.Second)
+
+	// Goroutine to send requests for pieces, until entire file is received
+	requestTicker := time.NewTicker(100000000) // 0.1 sec
 	go func() {
 		for range requestTicker.C {
 			if localState.SendARequest() {
@@ -314,14 +329,39 @@ func main() {
 		}
 	}()
 
+	// Goroutine to periodically clean up requests from RequestQueue
+	requestQueueCleanerTicker := time.NewTicker(1 * time.Second)
+	go func() {
+		for range requestQueueCleanerTicker.C {
+			var reqs_to_keep []int
+			for i, r := range localState.RequestQueue {
+				// Compare
+				if time.Now().Unix() - r.Timestamp > 5 {
+					localState.RequestQueue[i].Clean(&localState.Bitmap)
+				} else {
+					reqs_to_keep = append(reqs_to_keep, i)
+				}
+			}
+			for i, j := range reqs_to_keep {
+				localState.RequestQueue[i] = localState.RequestQueue[j]
+			}
+
+		}
+	}()
+
+	// Goroutine to periodically print download progress
+	downloadProgressTicker := time.NewTicker(1 * time.Second)
+	go func() {
+		for range downloadProgressTicker.C {
+			fmt.Println(localState.Bitmap)
+
+		}
+	}()
+
 	fmt.Println(localState)
 	fmt.Println(torrent_file.Announce)
 
 	fmt.Println("Hello!!!")
-
-	go func() {
-		localState.SendARequest()
-	}()
 
 	sendKeepAliveTicker := time.NewTicker(30 * time.Second)
 	go func() {

@@ -229,10 +229,12 @@ func (s *State) SendARequest() bool {
 	defer s.RequestLock.Unlock()
 
 	if s.Bitmap.AllDownloaded() {
+		fmt.Println("Tried to SendARequest() but all pieces are downloaded")
 		return true
 	}
 
 	if len(s.RequestQueue) >= request.QueueSize {
+		// fmt.Println("Tried to SendARequest() but the queue was full")
 		return false
 	}
 
@@ -263,13 +265,16 @@ func (s *State) SendARequest() bool {
 	b.Complete = false
 	b.Incomplete = true
 
+	// Add the block to the piece
+	s.Bitmap.Pieces[piece_index].Blocks = append(s.Bitmap.Pieces[piece_index].Blocks, *b)
+
 	// Increase pending bytes
 	s.Bitmap.Pieces[piece_index].Pending += b.Length
 
 	// Make a new request
 	r := new(request.Request)
-	r.Block = *b
-	r.Peer = peer
+	r.Block     = &s.Bitmap.Pieces[piece_index].Blocks[len(s.Bitmap.Pieces[piece_index].Blocks)-1]
+	r.Peer      = peer
 	r.Cancelled = false
 	r.Timestamp = time.Now().Unix()
 	r.Request_lock = new(sync.RWMutex)
@@ -279,7 +284,7 @@ func (s *State) SendARequest() bool {
 
 	peer.Connection.SendRequest(uint32(piece_index), uint32(b.Offset), uint32(b.Length))
 
-	fmt.Printf("Sent a request to %s\n", peer)
+	// fmt.Printf("REQUEST Piece %d\n", piece_index)
 	return false
 }
 
