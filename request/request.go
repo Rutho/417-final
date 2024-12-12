@@ -76,6 +76,16 @@ func SelectPiece(p *peer.Peer, self *bitmap.Bitmap) int {
 	// Get the pieces which I have started downloading
 	inprog := self.InProgress()
 
+	// Remove pieces which have no unrequested blocks
+	for i := len(inprog) - 1; i >= 0; i-- {
+		if len(inprog[i].NotRequested()) == 0 {
+			// Remove the item by replacing it with the last item and reslicing
+			inprog[i] = inprog[len(inprog)-1]
+			inprog = inprog[:len(inprog)-1]
+		}
+	}
+
+
 	// Get the intersection of each list
 	var intersection []int
 	for _, piece := range inprog {
@@ -207,6 +217,7 @@ func Clean(rq *[]Request, b *bitmap.Bitmap) {
 	for i := len(*rq) - 1; i >= 0; i-- {
 		if time.Now().Unix()-(*rq)[i].Timestamp > 4 {
 			b.Pieces[(*rq)[i].Block.PieceIndex].Pending -= (*rq)[i].Block.Length
+			(*rq)[i].Block.Pending = false
 
 			// Remove the item by replacing it with the last item and reslicing
 			(*rq)[i] = (*rq)[len(*rq)-1]

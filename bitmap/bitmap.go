@@ -454,6 +454,20 @@ func (p *Piece) BlocksDone() int {
 	return count
 }
 
+func (p *Piece) NotRequested() []Block {
+	// Returns a list of blocks that have yet to be requested
+	p.Piece_lock.RLock()
+	defer p.Piece_lock.RUnlock()
+
+	var output []Block
+	for i := 0; i < len(p.Blocks); i++ {
+		if p.Blocks[i].Incomplete && !p.Blocks[i].Pending {
+			output = append(output, p.Blocks[i])
+		}
+	}
+	return output
+}
+
 func (b *Bitmap) InProgress() []Piece {
 	// Returns:
 	//    a list of Pieces that have at least 1 block downloaded but not all
