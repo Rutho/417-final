@@ -24,7 +24,6 @@ import (
 	"math/rand"
 	"net"
 	"sort"
-	"sync"
 	"time"
 )
 
@@ -123,7 +122,6 @@ func main() {
 					s.DisconnectCh <- msg.PeerId
 					return
 				}
-				peer.Bitmap_lock.Lock()
 				// peer.Bitmap.New(localState.PieceHashes, localState.PieceLength, localState.FileSize)
 				for i, b := range msg.Payload {
 					for kth := 0; kth < 8; kth++ {
@@ -136,7 +134,6 @@ func main() {
 						}
 					}
 				}
-				peer.Bitmap_lock.Unlock()
 				extra, err := localState.Bitmap.HasExtraPieces(&peer.Bitmap)
 				if err != nil {
 					*disconnectCh <- peer.Peer_id
@@ -204,6 +201,7 @@ func main() {
 					if localState.Bitmap.Pieces[int(pieceIdx)].Incomplete() {
 						buf := msg.Payload[8:]
 						p.Uploaded_bytes += int64(len(buf))
+						fmt.Printf("added piece: %s", p)
 
 						f.WritePieceOffset(pieceIdx, int(pieceLength), pieceOffset, buf)
 						if f.IsPieceDownloaded(pieceIdx, int(pieceLength)) {
@@ -341,7 +339,6 @@ func main() {
 	*/
 	// Tickers for periodic tasks
 	optimisticUnchokingTicker := time.NewTicker(30 * time.Second)
-	calculateUploadRateTicker := time.NewTicker(10 * time.Second)
 	printLocalStateTicker := time.NewTicker(30 * time.Second)
 	var sendTrackerRequestTicker *time.Ticker
 	upcomingPanicRequest := false
@@ -376,16 +373,10 @@ func main() {
 			// Lock and perform optimistic unchoking
 			OptimisticUnchoking(&localState)
 
-		case <-calculateUploadRateTicker.C:
-			fmt.Println("CalculateUploadRate()")
-			// Lock and calculate upload rates
-			localState.PeersLock.RLock()
-			CalculateUploadRate(&localState)
-			localState.PeersLock.RUnlock()
 		case <-printLocalStateTicker.C:
-			localState.PeersLock.RLock()
+			localState.PeersLock.Lock()
 			fmt.Println(localState)
-			localState.PeersLock.RUnlock()
+			localState.PeersLock.Unlock()
 		case <-sendTrackerRequestTicker.C:
 			fmt.Println("sendTrackerRequest()")
 			data.Resend_get(request_info, torrent_file, response_info)
@@ -425,7 +416,7 @@ func OptimisticUnchoking(localState *state.State) {
 	defer localState.PeersLock.Unlock()
 	defer localState.Top4Lock.Unlock()
 
-	fmt.Println(localState)
+	//fmt.Println(localState)
 	if len(localState.Top4) == 4 && len(localState.Peers.List) > 4 {
 		SortPeersAndUpdateTop4(localState)
 
@@ -463,8 +454,11 @@ func OptimisticUnchoking(localState *state.State) {
 		optimisticPeer.Connection.SendUnchoke()
 		fmt.Printf("Unchoked: %s:%d\n", optimisticPeer.Ip, optimisticPeer.Port)
 
-		// print top4
-		localState.PrintTop4()
+		// Reset the uploaded bytes for next cycle
+		for i := range localState.Peers.List {
+			p := &localState.Peers.List[i]
+			p.Uploaded_bytes = 0
+		}
 	} else {
 		fmt.Println("Not enough peers for optimistic unchoking")
 	}
@@ -474,7 +468,7 @@ func OptimisticUnchoking(localState *state.State) {
 func SortPeersAndUpdateTop4(localState *state.State) {
 	// Sort the peers in descending order of upload speed. Latest unchoked peer may be a replacement
 	sort.SliceStable(localState.Peers.List, func(i, j int) bool {
-		return (localState.Peers.List)[i].Upload_speed > (localState.Peers.List)[j].Upload_speed
+		return (localState.Peers.List)[i].Uploaded_bytes > (localState.Peers.List)[j].Uploaded_bytes
 	})
 
 	// Update the top 4. Top4 stores pointers to Peer
@@ -497,7 +491,6 @@ func SortPeersAndUpdateTop4(localState *state.State) {
 				localState.Peers.List[i].Am_choking_lock.RUnlock()
 			}
 
-			fmt.Println("appending")
 			newTop4 = append(newTop4, &localState.Peers.List[i])
 		}
 		localState.Peers.List[i].Peer_choking_lock.RUnlock()
@@ -517,27 +510,6 @@ func contains(top_four []*peer.Peer, p *peer.Peer) bool {
 		}
 	}
 	return false
-}
-
-func CalculateUploadRate(localState *state.State) {
-	var wg sync.WaitGroup
-	for i := range localState.Peers.List {
-		wg.Add(1)
-		go func(p *peer.Peer) {
-			defer wg.Done()
-			time_elapsed := time.Now().UnixNano() - p.Last_time_updated
-			p.Last_time_updated = time.Now().UnixNano()
-			if time_elapsed == 0 {
-				fmt.Println("Time elapsed is 0")
-				p.Uploaded_bytes = 0
-				return
-			}
-			upload_speed := float64(p.Uploaded_bytes) / float64(time_elapsed)
-			p.Upload_speed = upload_speed
-			p.Uploaded_bytes = 0
-		}(&localState.Peers.List[i])
-	}
-	wg.Wait()
 }
 
 // Assigns a weight to each interested peer. New peers are 3x more likely to be chosen

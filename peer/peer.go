@@ -52,8 +52,6 @@ type Peer struct {
 	Peer_interested      bool
 	Peer_id              string
 	Uploaded_bytes       int64
-	Last_time_updated    int64
-	Upload_speed         float64
 	Bitmap_lock          *sync.RWMutex
 	Bitmap               bitmap.Bitmap
 	Top4_lock            *sync.RWMutex
@@ -79,8 +77,8 @@ func (p Peer) String() string {
 	//   var peer Peer
 	//   fmt.Println(peer)
 
-	return fmt.Sprintf("%s:%d Am_choking:%t Am_int:%t peer_chok:%t peer_int:%t upload_speed:%.2f", 
-		p.Ip.String(), p.Port, p.Am_choking, p.Am_interested, p.Peer_choking, p.Peer_interested, p.Upload_speed)
+	return fmt.Sprintf("%s:%d Am_choking:%t Am_int:%t peer_chok:%t peer_int:%t uploaded_bytes: %d", 
+		p.Ip.String(), p.Port, p.Am_choking, p.Am_interested, p.Peer_choking, p.Peer_interested, p.Uploaded_bytes)
 	//return fmt.Sprintf("%s:%d", p.Ip.String(), p.Port)
 }
 
