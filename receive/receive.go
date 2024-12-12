@@ -20,10 +20,15 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	//   false if something went wrong
 	//   true otherwise
 
+	fmt.Println("Process: Waiting locks")
+
 	s.RequestLock.Lock()
 	defer s.RequestLock.Unlock()
+	fmt.Println("Process: Waiting locks2")
 	s.BitmapLock.Lock()
 	defer s.BitmapLock.Unlock()
+
+	fmt.Println("Process: Locks gotten")
 
 	// Use it to find the request
 	req_idx := FindRequest(s.RequestQueue, piece_index, piece_offset, int64(len(buf)))
@@ -102,7 +107,8 @@ func VerifyPieceHash(s *state.State, buf []byte, piece_index int) bool {
 
 	// Hash the received piece
 	h := sha1.New()
-	r_hash := h.Sum(buf)
+	h.Write(buf)
+	r_hash := h.Sum(nil)
 
 	// compare the hashes
 	return bytes.Equal(e_hash, r_hash)

@@ -8,7 +8,7 @@ import (
 )
 
 const MaxBlockSize = 16384 // Maximum block size, in bytes
-const QueueSize    = 50    // How many pending requests can be in flight at once
+const QueueSize    = 16    // How many pending requests can be in flight at once
 
 type Request struct {
 	// Description:
@@ -158,7 +158,7 @@ func Cancel(rq *[]Request) {
 func (r *Request) Clean(b *bitmap.Bitmap) {
 	// Description:
 	//
-	//   a request was never answered, reset the piece
+	//   a request was never answered
 	//
 	// Parameters:
 	//
@@ -172,5 +172,8 @@ func (r *Request) Clean(b *bitmap.Bitmap) {
 	//
 	//   TODO
 
-	b.Pieces[r.Block.PieceIndex].Reset()
+	b.Pieces_lock.Lock()
+	defer b.Pieces_lock.Unlock()
+
+	b.Pieces[r.Block.PieceIndex].Pending -= r.Block.Length
 }

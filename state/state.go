@@ -47,6 +47,7 @@ type State struct {
 	FileSize     int64
 	NumPieces    int
 	Info_hash    []byte
+	RN int
 }
 
 func (s State) String() string {
@@ -283,7 +284,8 @@ func (s *State) SendARequest() bool {
 
 	peer.Connection.SendRequest(uint32(piece_index), uint32(b.Offset), uint32(b.Length))
 
-	fmt.Printf("REQUEST %s\n", r.Block)
+	s.RN += 1
+	fmt.Printf("REQUEST %d %s\n", s.RN, r.Block)
 	return false
 }
 

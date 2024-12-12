@@ -168,16 +168,12 @@ func (b *Bitmap) New(hashes []byte, piece_len int64, file_len int64) {
 			min = file_len - file_offset
 		}
 
-		// Create a new piece and initialize the fields
-		p := new(Piece)
-		p.Index      = idx
-		p.Length     = min
-		p.Hash       = hashes[hash_offset:hash_offset+20]
-		p.FileOffset = file_offset
-		p.Piece_lock = new(sync.RWMutex)
+		// Create a new piece
+		var p Piece
+		p.New(idx, min, hashes[hash_offset:hash_offset+20], file_offset)
 
 		// Add the piece to the bitmap
-		b.Pieces = append(b.Pieces, *p)
+		b.Pieces = append(b.Pieces, p)
 
 		// Next piece
 		idx++
@@ -441,6 +437,17 @@ func (b *Bitmap) PendingIncomplete() []Piece {
 	return output
 }
 
+func (p *Piece) BlocksDone() int {
+	count := 0
+	// How many blocks of this piece are completed?
+	for i := range p.Blocks {
+		if p.Blocks[i].Complete {
+			count += 1
+		}
+	}
+	return count
+}
+
 func (b *Bitmap) InProgress() []Piece {
 	// Description:
 	//    Returns a list of Pieces that have at least 1 block downloaded but not completely done
@@ -450,7 +457,7 @@ func (b *Bitmap) InProgress() []Piece {
 
 	var output []Piece
 	for i := 0; i < len(b.Pieces); i++ {
-		if len(b.Pieces[i].Blocks) > 0 && b.Pieces[i].PendingIncomplete() {
+		if b.Pieces[i].BlocksDone() > 0 && b.Pieces[i].PendingIncomplete() {
 			output = append(output, b.Pieces[i])
 		}
 	}
@@ -544,4 +551,38 @@ func (p *Piece) Reset() {
 	p.Blocks   = nil
 	p.Progress = 0
 	p.Pending  = 0
+}
+
+func (p *Piece) New(idx int, length int64, hash []byte, file_offset int64) {
+	p.Index      = idx
+	p.Length     = length
+	p.Hash       = hash
+	p.FileOffset = file_offset
+	p.Piece_lock = new(sync.RWMutex)
+
+	p.Blocks     = nil
+	p.Progress   = 0
+	p.Pending    = 0
+
+
+	// Take the length and divide it into block sizes
+	var offset int64
+	tlen := p.Length
+
+	for tlen > 0 {
+		var b Block
+		var curr_b_len int64
+
+		if tlen - 16384 > 0 {
+			curr_b_len = 16384
+		} else {
+			curr_b_len = tlen
+		}
+
+		b.New(p.Index, offset, curr_b_len)
+		p.Blocks = append(p.Blocks, b)
+
+		offset += curr_b_len
+		tlen -= curr_b_len
+	}
 }
