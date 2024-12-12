@@ -1,7 +1,7 @@
 package bitmap
 
 import (
-	// "fmt"
+	"fmt"
 	"math"
 	"sync"
 )
@@ -117,13 +117,14 @@ func (b Bitmap) String() string {
 		} else {
 			output += "0"
 		}
-		if i > 90 {
-			output += "..."
-			break
+		if i > 80 {
+			output += fmt.Sprintf("...] (%d/%d)", len(b.Incomplete()), len(b.Pieces))
+			return output
 		}
 	}
 	return output + "]"
 }
+
 
 func (b *Bitmap) New(hashes []byte, piece_len int64, file_len int64) {
 	// Description:

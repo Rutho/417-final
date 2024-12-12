@@ -322,7 +322,8 @@ func main() {
 	}
 
 	time.Sleep(20000000000)
-	//Separate goroutine to send requests for pieces
+
+	// Goroutine to send requests for pieces, until entire file is received
 	requestTicker := time.NewTicker(1 * time.Second)
 	go func() {
 		for range requestTicker.C {
@@ -331,6 +332,24 @@ func main() {
 				requestTicker.Stop()
 				// Cancel outgoing requests
 				request.Cancel(&localState.RequestQueue)
+			}
+		}
+	}()
+
+	// Goroutine to send periodically clean up requests from RequestQueue
+	requestQueueCleanerTicker := time.NewTicker(2 * time.Second)
+	go func() {
+		for range requestQueueCleanerTicker.C {
+			for i, r := range localState.RequestQueue {
+				// Compare
+				if time.Now().Unix() - r.Timestamp > 5 {
+					fmt.Println("Stale request removed!")
+
+					// Remove the Request from RequestQueue
+					localState.RequestQueue[i] = localState.RequestQueue[len(localState.RequestQueue)-1]
+					localState.RequestQueue = localState.RequestQueue[:len(localState.RequestQueue)-1]
+
+				}
 			}
 		}
 	}()
