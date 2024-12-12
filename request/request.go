@@ -9,7 +9,7 @@ import (
 )
 
 const MaxBlockSize = 16384 // Maximum block size, in bytes
-const QueueSize    = 20    // How many pending requests can be in flight at once
+const QueueSize = 20       // How many pending requests can be in flight at once
 
 type Request struct {
 	// Description:
@@ -25,10 +25,10 @@ type Request struct {
 	//   Timestamp : number of seconds since the Unix epoch
 	//   Request_lock : for thread safety
 
-	Block      *bitmap.Block
-	Peer       *peer.Peer
-	Cancelled  bool
-	Timestamp  int64
+	Block        *bitmap.Block
+	Peer         *peer.Peer
+	Cancelled    bool
+	Timestamp    int64
 	Request_lock *sync.RWMutex
 }
 
@@ -106,7 +106,7 @@ func SelectPiece(p *peer.Peer, self *bitmap.Bitmap) int {
 	// just pick any piece
 
 	// Get the pieces that the local client needs
-	my_bitmap    := self.Incomplete()
+	my_bitmap := self.Incomplete()
 
 	// Get the intersection of each list
 	intersection = nil
@@ -188,8 +188,8 @@ func Cancel(rq *[]Request) {
 
 	for i := range *rq {
 		piece_index := (*rq)[i].Block.PieceIndex
-		offset      := (*rq)[i].Block.Offset
-		length      := (*rq)[i].Block.Length
+		offset := (*rq)[i].Block.Offset
+		length := (*rq)[i].Block.Length
 		(*rq)[i].Peer.Connection.SendCancel(uint32(piece_index), uint32(offset), uint32(length))
 	}
 

@@ -21,7 +21,6 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 
 	s.RequestLock.Lock()
 	defer s.RequestLock.Unlock()
-
 	// Use it to find the request
 	req_idx := FindRequest(s.RequestQueue, piece_index, piece_offset, int64(len(buf)))
 	if req_idx == -1 {
@@ -36,13 +35,11 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	}
 
 	// Update the block
-	for i := range buf {
-		s.RequestQueue[req_idx].Block.Buf = append(s.RequestQueue[req_idx].Block.Buf, buf[i])
-	}
-	s.RequestQueue[req_idx].Block.Complete   = true
-	s.RequestQueue[req_idx].Block.Pending    = false
-	s.RequestQueue[req_idx].Block.Incomplete = false
+	s.RequestQueue[req_idx].Block.Buf = append(s.RequestQueue[req_idx].Block.Buf, buf...)
 
+	s.RequestQueue[req_idx].Block.Complete = true
+	s.RequestQueue[req_idx].Block.Pending = false
+	s.RequestQueue[req_idx].Block.Incomplete = false
 	// Get Piece
 	piece := &s.Bitmap.Pieces[piece_index]
 
@@ -50,7 +47,7 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	for i := range s.Bitmap.Pieces[piece_index].Blocks {
 		if s.Bitmap.Pieces[piece_index].Blocks[i].Equals(s.RequestQueue[req_idx].Block) {
 			// if s.Bitmap.Pieces[piece_index].Blocks[i].Buf != nil {
-				// fmt.Println("it's already got data.")
+			// fmt.Println("it's already got data.")
 			// }
 			copy(s.Bitmap.Pieces[piece_index].Blocks[i].Buf, buf)
 		}
@@ -59,7 +56,6 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	// Remove the Request from RequestQueue
 	s.RequestQueue[req_idx] = s.RequestQueue[len(s.RequestQueue)-1]
 	s.RequestQueue = s.RequestQueue[:len(s.RequestQueue)-1]
-
 
 	// Update the piece
 	s.Bitmap.Pieces[piece_index].Progress += int64(len(buf))
