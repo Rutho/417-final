@@ -128,12 +128,11 @@ func (s *State) ParseClargs() {
 
 	// Define -p <port number>
 	// Default value 8080 (BitTorrent typically uses 6881-6889, and 6969 for tracker)
-	port := flag.Int("p", 8080, "port of host")
+	s.Port = *flag.Int("p", 8080, "port of host")
 
 	// Parse the command line into the defined flags
 	flag.Parse()
 	s.TorrentFile = *t
-	s.Port = *port
 }
 
 func (s *State) GenerateID() string {
@@ -257,7 +256,8 @@ func (s *State) SendARequest() bool {
 	}
 
 	if min == 0 {
-		panic("Can't request a block of size zero!")
+		fmt.Println("Can't request a block of size zero!")
+		return false
 	}
 
 	// Make a new block
