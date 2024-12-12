@@ -21,32 +21,44 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 
 	s.RequestLock.Lock()
 	defer s.RequestLock.Unlock()
-	// Use it to find the request
-	req_idx := FindRequest(s.RequestQueue, piece_index, piece_offset, int64(len(buf)))
-	if req_idx == -1 {
-		fmt.Println("Received a block, but couldn't find the request I made for it. Ignoring.")
+
+	// Construct a temporary block for search
+	var temp_block bitmap.Block
+	temp_block.New(piece_index, piece_offset, int64(len(buf)))
+
+	var block *bitmap.Block = nil
+	for i := range s.Bitmap.Pieces[piece_index].Blocks {
+		if s.Bitmap.Pieces[piece_index].Blocks[i].Equals(&temp_block) {
+			block = &s.Bitmap.Pieces[piece_index].Blocks[i]
+		}
+	}
+	if block == nil {
+		fmt.Println("Received a block, but couldn't identify it. Ignoring.")
+		return false
+	}
+	if block.Complete {
+		fmt.Println("Already received this block. Ignoring.")
 		return false
 	}
 
-	// Did we already receive this block?
-	if s.RequestQueue[req_idx].Block.Complete {
-		fmt.Println("Received the same block again. Ignoring.")
-		return false
+	// Find the request
+	req_idx := FindRequest(s.RequestQueue, piece_index, piece_offset, int64(len(buf)))
+	if req_idx != -1 {
+		// Remove the Request from RequestQueue
+		s.RequestQueue[req_idx] = s.RequestQueue[len(s.RequestQueue)-1]
+		s.RequestQueue = s.RequestQueue[:len(s.RequestQueue)-1]
 	}
 
 	// Write to the file
-	s.FM.WriteOffset(s.Bitmap.Pieces[piece_index].FileOffset + s.RequestQueue[req_idx].Block.Offset, buf)
+	s.FM.WriteOffset(s.Bitmap.Pieces[piece_index].FileOffset + block.Offset, buf)
 
 	// Update the block
-	s.RequestQueue[req_idx].Block.Complete = true
-	s.RequestQueue[req_idx].Block.Pending = false
-	s.RequestQueue[req_idx].Block.Incomplete = false
+	block.Complete = true
+	block.Pending = false
+	block.Incomplete = false
+
 	// Get Piece
 	piece := &s.Bitmap.Pieces[piece_index]
-
-	// Remove the Request from RequestQueue
-	s.RequestQueue[req_idx] = s.RequestQueue[len(s.RequestQueue)-1]
-	s.RequestQueue = s.RequestQueue[:len(s.RequestQueue)-1]
 
 	// Update the piece
 	s.Bitmap.Pieces[piece_index].Progress += int64(len(buf))

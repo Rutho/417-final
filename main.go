@@ -218,9 +218,9 @@ func main() {
 					//Should we include these messages for the calculation of peer's upload rate then? YES
 
 					buf := msg.Payload[8:]
-
 					if len(buf) == 0 {
-						panic("payload is size 0")
+						fmt.Println("payload is size 0??")
+						break
 					}
 
 					p := localState.Peers.FindPeerByID(msg.PeerId)
