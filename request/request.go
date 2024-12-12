@@ -42,7 +42,7 @@ func SelectBlock(p *bitmap.Piece) *bitmap.Block {
 	//   a pointer to the block
 
 	for i := range p.Blocks {
-		if p.Blocks[i].Incomplete {
+		if p.Blocks[i].Incomplete && !p.Blocks[i].Pending {
 			return &p.Blocks[i]
 		}
 	}

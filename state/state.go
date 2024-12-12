@@ -258,6 +258,9 @@ func (s *State) SendARequest() bool {
 	// Increase pending bytes
 	s.Bitmap.Pieces[piece_index].Pending += block.Length
 
+	// Mark the block as currently being requested
+	block.Pending = true
+
 	// Make a new request
 	r := new(request.Request)
 	r.Block     = block

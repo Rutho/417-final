@@ -72,6 +72,7 @@ type Block struct {
 	Buf        []byte
 
 	Complete   bool
+	Pending    bool
 	Incomplete bool
 }
 
@@ -547,6 +548,7 @@ func (b *Block) New(idx int, offset int64, length int64) {
 	b.Block_lock = new(sync.RWMutex)
 	b.Buf        = nil
 	b.Complete   = false
+	b.Pending    = false
 	b.Incomplete = true
 }
 
@@ -558,6 +560,7 @@ func (p *Piece) Reset() {
 	for i := range p.Blocks {
 		p.Blocks[i].Buf        = nil
 		p.Blocks[i].Complete   = false
+		p.Blocks[i].Pending    = false
 		p.Blocks[i].Incomplete = true
 	}
 	p.Progress = 0

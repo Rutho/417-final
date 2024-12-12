@@ -39,7 +39,8 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	for i := range buf {
 		s.RequestQueue[req_idx].Block.Buf = append(s.RequestQueue[req_idx].Block.Buf, buf[i])
 	}
-	s.RequestQueue[req_idx].Block.Complete = true
+	s.RequestQueue[req_idx].Block.Complete   = true
+	s.RequestQueue[req_idx].Block.Pending    = false
 	s.RequestQueue[req_idx].Block.Incomplete = false
 
 	// Get Piece
