@@ -350,7 +350,7 @@ func (conn *ConnectionState) sendMessage(msg Message) {
 	msgBytes = append(msgBytes, msg.Payload...)
 	_, err := (*conn.Conn).Write(msgBytes)
 	if err != nil {
-		fmt.Println("sendMessage: fprintf error.")
+		fmt.Println("sendMessage: fprintf error.", err)
 	}
 }
 

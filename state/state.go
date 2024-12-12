@@ -2,9 +2,9 @@ package state
 
 import (
 	"client/bitmap"
+	"client/filemanager"
 	"client/peer"
 	"client/request"
-	"client/filemanager"
 	"flag" // https://pkg.go.dev/flag
 	"fmt"  // https://pkg.go.dev/fmt
 	"math/rand"
@@ -131,11 +131,12 @@ func (s *State) ParseClargs() {
 
 	// Define -p <port number>
 	// Default value 8080 (BitTorrent typically uses 6881-6889, and 6969 for tracker)
-	s.Port = *flag.Int("p", 8080, "port of host")
+	port := flag.Int("p", 8080, "port of host")
 
 	// Parse the command line into the defined flags
 	flag.Parse()
 	s.TorrentFile = *t
+	s.Port = *port
 }
 
 func (s *State) GenerateID() string {

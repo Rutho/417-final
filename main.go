@@ -221,6 +221,8 @@ func main() {
 					if len(buf) == 0 {
 						fmt.Println("payload is size 0??")
 						break
+						fmt.Println("payload is size 0")
+						return
 					}
 
 					p := localState.Peers.FindPeerByID(msg.PeerId)
@@ -229,7 +231,7 @@ func main() {
 
 					ok := receive.Process(&localState, pieceIdx, int64(pieceOffset), buf)
 					if !ok { // something went wrong (e.g. incorrect hash)
-						break
+						return
 					}
 
 					// fmt.Printf("after Process(): GOT Piece %d %d\n", pieceIdx, pieceOffset)
@@ -353,7 +355,7 @@ func main() {
 	}()
 
 	// Goroutine to periodically clean up requests from RequestQueue
-	requestQueueCleanerTicker := time.NewTicker(1 * time.Second)
+	requestQueueCleanerTicker := time.NewTicker(3 * time.Second)
 	go func() {
 		for range requestQueueCleanerTicker.C {
 			localState.RequestLock.Lock()
