@@ -45,26 +45,27 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	piece := &s.Bitmap.Pieces[piece_index]
 
 	// Update the piece
-	piece.Pending -= int64(len(buf))
 	piece.Progress += int64(len(buf))
+
+	for _, b := range s.Bitmap.Pieces[piece_index].Blocks {
+		fmt.Printf("%s ", b)
+	}
+	fmt.Printf("\n")
 
 	// Check the hash of the piece if it's complete
 	ok := true
 	if piece.Complete() {
 		ok = VerifyPieceHash(s, Aggregate(piece), piece_index)
 		if !ok {
-			for _, b := range s.Bitmap.Pieces[piece_index].Blocks {
-                fmt.Printf("%s ", b)
-            }
-            fmt.Printf("\n")
 			// Reset the piece
-			s.Bitmap.Pieces[piece_index].Blocks   = nil
-			s.Bitmap.Pieces[piece_index].Progress = 0
-			s.Bitmap.Pieces[piece_index].Pending  = 0
+			s.Bitmap.Pieces[piece_index].Reset()
+
 			fmt.Printf("Piece %d fully downloaded, but hash is incorrect.\n", piece_index)
 		} else {
 			fmt.Printf("Piece %d fully downloaded!\n", piece_index)
 		}
+	} else {
+		fmt.Printf("Piece %d not yet fully downloaded. Progress = %d / %d\n", piece_index, piece.Progress, piece.Length)
 	}
 
 	// Update the peer's upload rate
