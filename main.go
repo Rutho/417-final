@@ -207,20 +207,14 @@ func main() {
 
 					buf := msg.Payload[8:]
 
-					// // If the piece isn't valid
-					// if receive.VerifyPieceHash(&localState, buf, pieceIdx) == false {
-					// 	break // ignore the piece
-					// }
-
 					p := localState.Peers.FindPeerByID(msg.PeerId)
-					fmt.Printf("Received and validated Piece from %s\n", p)
 
-					fmt.Printf("Process()\n")
 					ok := receive.Process(&localState, pieceIdx, int64(pieceOffset), buf)
-
-					if !ok { // incorrect hash
+					if !ok { // something went wrong (e.g. incorrect hash)
 						break
 					}
+
+					// fmt.Printf("GOT Piece %d\n", pieceIdx)
 
 					p.Uploaded_bytes += int64(len(buf))
 
@@ -324,7 +318,7 @@ func main() {
 	time.Sleep(20000000000)
 
 	// Goroutine to send requests for pieces, until entire file is received
-	requestTicker := time.NewTicker(1 * time.Second)
+	requestTicker := time.NewTicker(100000000) // 0.1 sec
 	go func() {
 		for range requestTicker.C {
 			if localState.SendARequest() {
@@ -336,21 +330,32 @@ func main() {
 		}
 	}()
 
-	// Goroutine to send periodically clean up requests from RequestQueue
-	requestQueueCleanerTicker := time.NewTicker(2 * time.Second)
+	// Goroutine to periodically clean up requests from RequestQueue
+	requestQueueCleanerTicker := time.NewTicker(1 * time.Second)
 	go func() {
 		for range requestQueueCleanerTicker.C {
+			var reqs_to_keep []int
 			for i, r := range localState.RequestQueue {
 				// Compare
 				if time.Now().Unix() - r.Timestamp > 5 {
-					fmt.Println("Stale request removed!")
-
-					// Remove the Request from RequestQueue
-					localState.RequestQueue[i] = localState.RequestQueue[len(localState.RequestQueue)-1]
-					localState.RequestQueue = localState.RequestQueue[:len(localState.RequestQueue)-1]
-
+					localState.RequestQueue[i].Clean(&localState.Bitmap)
+				} else {
+					reqs_to_keep = append(reqs_to_keep, i)
 				}
 			}
+			for i, j := range reqs_to_keep {
+				localState.RequestQueue[i] = localState.RequestQueue[j]
+			}
+
+		}
+	}()
+
+	// Goroutine to periodically print download progress
+	downloadProgressTicker := time.NewTicker(1 * time.Second)
+	go func() {
+		for range downloadProgressTicker.C {
+			fmt.Println(localState.Bitmap)
+
 		}
 	}()
 
@@ -358,10 +363,6 @@ func main() {
 	fmt.Println(torrent_file.Announce)
 
 	fmt.Println("Hello!!!")
-
-	go func() {
-		localState.SendARequest()
-	}()
 
 	sendKeepAliveTicker := time.NewTicker(30 * time.Second)
 	go func() {

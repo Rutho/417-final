@@ -548,6 +548,7 @@ func Send_udp(request *Tracker_request, ip string, g_port int, response *Tracker
 }
 
 func Resend_get(request *Tracker_request, info *Torrent_info, response *Tracker_response) {
+	response.Peers = new([]peer.Peer)
 
 	tmp_ip, tmp_port := info.Tracker_ip, info.Tracker_port
 	var ret int = 0

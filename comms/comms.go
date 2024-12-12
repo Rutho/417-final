@@ -299,7 +299,7 @@ func (conn *ConnectionState) SendRequest(pieceIdx uint32, start_offset uint32, n
 	binary.BigEndian.PutUint32(startOffsetBuf, start_offset)
 	binary.BigEndian.PutUint32(nBuf, n)
 	requestMsg.Payload = append(pieceIdxBuf, append(startOffsetBuf, nBuf...)...)
-	fmt.Printf("request payload: %v\n", requestMsg.Payload)
+	// fmt.Printf("request payload: %v\n", requestMsg.Payload)
 	conn.sendMessage(requestMsg)
 }
 

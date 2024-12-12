@@ -118,7 +118,7 @@ func (b Bitmap) String() string {
 			output += "0"
 		}
 		if i > 80 {
-			output += fmt.Sprintf("...] (%d/%d)", len(b.Incomplete()), len(b.Pieces))
+			output += fmt.Sprintf("...] (%d/%d)", len(b.PendingComplete()), len(b.Pieces))
 			return output
 		}
 	}
@@ -441,6 +441,22 @@ func (b *Bitmap) PendingIncomplete() []Piece {
 	return output
 }
 
+func (b *Bitmap) InProgress() []Piece {
+	// Description:
+	//    Returns a list of Pieces that have at least 1 block downloaded
+
+	b.Pieces_lock.RLock()
+	defer b.Pieces_lock.RUnlock()
+
+	var output []Piece
+	for i := 0; i < len(b.Pieces); i++ {
+		if len(b.Pieces[i].Blocks) > 0 {
+			output = append(output, b.Pieces[i])
+		}
+	}
+	return output
+}
+
 func (p *Piece) Complete() bool {
 	// Returns true if:
 	//   the piece is 100% downloaded
@@ -482,11 +498,50 @@ func (a *Block) Equals(b *Block) bool {
 	//
 	//    method on the Block struct that returns true if a and b are equal
 
+	if a == nil || b == nil {
+		return false
+	}
+
 	a.Block_lock.RLock()
-	b.Block_lock.RLock()
 	defer a.Block_lock.RUnlock()
+	b.Block_lock.RLock()
 	defer b.Block_lock.RUnlock()
 
 	return a.PieceIndex == b.PieceIndex && a.Offset == b.Offset && a.Length == b.Length
 }
 
+func (b *Block) New(idx int, offset int64, length int64) {
+	// Description:
+	//
+	//   method on the Block struct that initializes it
+	//
+	// Parameters:
+	//
+	//   TODO
+	//
+	// Returns:
+	//
+	//   TODO
+	//
+	// Example usage:
+	//
+	//   TODO
+
+	b.PieceIndex = idx
+	b.Offset     = offset
+	b.Length     = length
+	b.Block_lock = new(sync.RWMutex)
+	b.Buf        = nil
+	b.Complete   = false
+	b.Incomplete = true
+}
+
+func (b *Block) String() {
+	return fmt.Sprintf("<%d %d %d>", b.PieceIndex, b.Offset, b.Length)
+}
+
+func (p *Piece) Reset() {
+	p.Blocks   = nil
+	p.Progress = 0
+	p.Pending  = 0
+}
