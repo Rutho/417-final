@@ -536,7 +536,7 @@ func (b *Block) New(idx int, offset int64, length int64) {
 	b.Incomplete = true
 }
 
-func (b *Block) String() {
+func (b *Block) String() string {
 	return fmt.Sprintf("<%d %d %d>", b.PieceIndex, b.Offset, b.Length)
 }
 

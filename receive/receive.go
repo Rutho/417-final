@@ -53,7 +53,10 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	if piece.Complete() {
 		ok = VerifyPieceHash(s, Aggregate(piece), piece_index)
 		if !ok {
-			fmt.Printf(s.Bitmap.Pieces[piece_index].Blocks)
+			for _, b := range s.Bitmap.Pieces[piece_index].Blocks {
+                fmt.Printf("%s ", b)
+            }
+            fmt.Printf("\n")
 			// Reset the piece
 			s.Bitmap.Pieces[piece_index].Blocks   = nil
 			s.Bitmap.Pieces[piece_index].Progress = 0
