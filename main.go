@@ -120,7 +120,9 @@ func main() {
 	go func(msgCh chan comms.Message) {
 		for msg := range msgCh {
 			//fmt.Printf("peer address: %s\n", msg.PeerAddress)
+			localState.PeersLock.RLock()
 			peer := localState.Peers.FindPeerByID(msg.PeerId)
+			localState.PeersLock.RUnlock()
 			if peer == nil {
 				continue
 			}
