@@ -337,7 +337,7 @@ func main() {
 	time.Sleep(20000000000)
 
 	// Goroutine to send requests for pieces, until entire file is received
-	requestTicker := time.NewTicker(25000000) // 0.025 sec
+	requestTicker := time.NewTicker(10000000) // 0.025 sec
 	go func() {
 		for range requestTicker.C {
 			if localState.SendARequest() {
