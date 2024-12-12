@@ -122,10 +122,19 @@ func SelectPeer(pl *peer.Peers) *peer.Peer {
 		return nil
 	}
 
-	// Pick a random peer
-	rand_idx := rand.Intn(len(interested_peers))
+	// Filter the list by those who are not choking us
+	var not_choking_us []peer.Peer
 
-	return &interested_peers[rand_idx]
+	for i := range interested_peers {
+		if interested_peers[i].Peer_choking == false {
+			not_choking_us = append(not_choking_us, interested_peers[i])
+		}
+	}
+
+	// Pick a random peer
+	rand_idx := rand.Intn(len(not_choking_us))
+
+	return &not_choking_us[rand_idx]
 }
 
 func Cancel(rq *[]Request) {
