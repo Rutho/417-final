@@ -216,8 +216,6 @@ func main() {
 					buf := msg.Payload[8:]
 					if len(buf) == 0 {
 						fmt.Println("payload is size 0??")
-						break
-						fmt.Println("payload is size 0")
 						return
 					}
 
