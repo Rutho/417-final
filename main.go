@@ -353,7 +353,6 @@ func main() {
 	go func() {
 		for range downloadProgressTicker.C {
 			fmt.Println(localState.Bitmap)
-
 		}
 	}()
 
