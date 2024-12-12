@@ -153,9 +153,10 @@ func ReadFromFile(s *state.State, p *bitmap.Piece, b *bitmap.Block) {
 
 	if b.Incomplete {
 		// We didn't write to the file
+		fmt.Println("You can't read from the file if you never wrote to it!")
 		return
 	}
 
 	// Read from file -> buf
-	b.Buf, _, _ = s.FM.ReadOffset(p.FileOffset + b.Offset, uint32(len(b.Buf)))
+	b.Buf, _, _ = s.FM.ReadOffset(p.FileOffset + b.Offset, uint32(b.Length))
 }
