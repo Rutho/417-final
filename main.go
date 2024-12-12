@@ -473,6 +473,9 @@ func main() {
 			localState.PeersLock.RUnlock()
 		case <-sendTrackerRequestTicker.C:
 			fmt.Println("sendTrackerRequest()")
+			totaldl := len(localState.Bitmap.Complete()) * int(torrent_file.Info["piece length"].(int64))
+			request_info.Downloaded = totaldl
+			request_info.Left = request_info.Left - totaldl
 			data.Resend_get(request_info, torrent_file, response_info)
 			for _, p := range *response_info.Peers {
 				if localState.FindPeerByAddr(p.Ip, p.Port) != nil {
