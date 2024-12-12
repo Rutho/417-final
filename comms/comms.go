@@ -201,7 +201,7 @@ func (s *Server) ReadLoop(conn *ConnectionState) error {
 			payloadBuf := make([]byte, msgLen)
 			n, err := io.ReadFull(c, payloadBuf)
 			fmt.Printf("read %d bytes\n", n)
-			if err == io.EOF {
+			if err != nil {
 				fmt.Println("message payload: read error:", err)
 				return err
 			}
