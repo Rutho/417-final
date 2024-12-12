@@ -202,14 +202,10 @@ func main() {
 				pieceOffset := int(binary.BigEndian.Uint32(msg.Payload[4:8]))
 				switch msg.MsgType {
 				case comms.Piece:
-					// If we have all the pieces
-					if localState.Bitmap.AllDownloaded() {
+					if localState.Seeder {
 						break // ignore the piece
 					}
-					// // If we have the piece
-					// if localState.Bitmap.Pieces[int(pieceIdx)].PendingComplete() {
-					// 	break // ignore the piece
-					// }
+
 
 					//TODO: Update Peer's upload rate
 					//Either peer is sending us stuff willy-nilly or piece was completed
@@ -359,6 +355,10 @@ func main() {
 			localState.RequestLock.Lock()
 			request.Clean(&localState.RequestQueue, &localState.Bitmap)
 			localState.RequestLock.Unlock()
+
+			if localState.Seeder {
+				requestQueueCleanerTicker.Stop()
+			}
 		}
 	}()
 
@@ -367,6 +367,10 @@ func main() {
 	go func() {
 		for range downloadProgressTicker.C {
 			fmt.Println(localState.Bitmap)
+
+			if localState.Seeder {
+				downloadProgressTicker.Stop()
+			}
 		}
 	}()
 
