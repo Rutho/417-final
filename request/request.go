@@ -172,8 +172,8 @@ func (r *Request) Clean(b *bitmap.Bitmap) {
 	//
 	//   TODO
 
-	b.Pieces_lock.Lock()
-	defer b.Pieces_lock.Unlock()
+	// b.Pieces_lock.Lock()
+	// defer b.Pieces_lock.Unlock()
 
 	b.Pieces[r.Block.PieceIndex].Pending -= r.Block.Length
 }

@@ -247,7 +247,7 @@ func (pl *Peers) AmChoking() []Peer {
 
 	var output []Peer
 	for i := range pl.List {
-		if pl.List[i].Am_interested == true {
+		if pl.List[i].Am_choking == true {
 			output = append(output, pl.List[i])
 		}
 	}

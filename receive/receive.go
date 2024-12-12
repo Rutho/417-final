@@ -20,16 +20,6 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	//   false if something went wrong
 	//   true otherwise
 
-	fmt.Println("Process: Waiting locks")
-
-	s.RequestLock.Lock()
-	defer s.RequestLock.Unlock()
-	fmt.Println("Process: Waiting locks2")
-	s.BitmapLock.Lock()
-	defer s.BitmapLock.Unlock()
-
-	fmt.Println("Process: Locks gotten")
-
 	// Use it to find the request
 	req_idx := FindRequest(s.RequestQueue, piece_index, piece_offset, int64(len(buf)))
 	if req_idx == -1 {
@@ -52,10 +42,10 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	// Update the piece
 	piece.Progress += int64(len(buf))
 
-	for _, b := range s.Bitmap.Pieces[piece_index].Blocks {
-		fmt.Printf("%s ", b)
-	}
-	fmt.Printf("\n")
+	// for _, b := range s.Bitmap.Pieces[piece_index].Blocks {
+	// 	fmt.Printf("%s ", b)
+	// }
+	// fmt.Printf("\n")
 
 	// Check the hash of the piece if it's complete
 	ok := true
@@ -70,7 +60,7 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 			fmt.Printf("Piece %d fully downloaded!\n", piece_index)
 		}
 	} else {
-		fmt.Printf("Piece %d not yet fully downloaded. Progress = %d / %d\n", piece_index, piece.Progress, piece.Length)
+		// fmt.Printf("Piece %d not yet fully downloaded. Progress = %d / %d\n", piece_index, piece.Progress, piece.Length)
 	}
 
 	// Update the peer's upload rate
