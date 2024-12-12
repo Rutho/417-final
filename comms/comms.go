@@ -191,7 +191,7 @@ func (s *Server) ReadLoop(conn *ConnectionState) error {
 		msgLenBuf := make([]byte, 4)
 		msgLenN, err := c.Read(msgLenBuf)
 		//fmt.Printf("%v\n", msgLenBuf)
-		if msgLenN != 4 || err == io.EOF {
+		if msgLenN != 4 || err != nil {
 			fmt.Printf("ip: %s, readloop: read error: %s\n", conn.PeerAddress, err)
 			return err
 		}

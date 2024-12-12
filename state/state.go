@@ -225,10 +225,8 @@ func (s *State) SendARequest() bool {
 
 	s.PeersLock.Lock()
 	s.BitmapLock.Lock()
-	s.RequestLock.Lock()
 	defer s.PeersLock.Unlock()
 	defer s.BitmapLock.Unlock()
-	defer s.RequestLock.Unlock()
 
 	if s.Bitmap.AllDownloaded() {
 		fmt.Println("Tried to SendARequest() but all pieces are downloaded")
@@ -274,8 +272,8 @@ func (s *State) SendARequest() bool {
 
 	// Make a new request
 	r := new(request.Request)
-	r.Block     = &s.Bitmap.Pieces[piece_index].Blocks[len(s.Bitmap.Pieces[piece_index].Blocks)-1]
-	r.Peer      = peer
+	r.Block = &s.Bitmap.Pieces[piece_index].Blocks[len(s.Bitmap.Pieces[piece_index].Blocks)-1]
+	r.Peer = peer
 	r.Cancelled = false
 	r.Timestamp = time.Now().Unix()
 	r.Request_lock = new(sync.RWMutex)
