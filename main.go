@@ -336,10 +336,15 @@ func main() {
 	requestQueueCleanerTicker := time.NewTicker(1 * time.Second)
 	go func() {
 		for range requestQueueCleanerTicker.C {
+
+			// fmt.Println("Cleaner: waiting lock")
+			// localState.RequestLock.Lock()
+			// fmt.Println("Cleaner: got lock")
+
 			var reqs_to_keep []int
 			for i, r := range localState.RequestQueue {
 				// Compare
-				if time.Now().Unix() - r.Timestamp > 15 {
+				if time.Now().Unix() - r.Timestamp > 5 {
 					localState.RequestQueue[i].Clean(&localState.Bitmap)
 				} else {
 					reqs_to_keep = append(reqs_to_keep, i)
@@ -348,6 +353,8 @@ func main() {
 			for i, j := range reqs_to_keep {
 				localState.RequestQueue[i] = localState.RequestQueue[j]
 			}
+			// fmt.Println("Cleaner: releasing lock")
+			// localState.RequestLock.Unlock()
 
 		}
 	}()
