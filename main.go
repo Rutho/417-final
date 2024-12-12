@@ -15,8 +15,8 @@ import (
 	"client/data"
 	"client/filemanager"
 	"client/peer"
-	"client/receive"
 	"client/request"
+	"client/receive"
 	"client/state"
 	"encoding/binary"
 	"fmt"
@@ -218,37 +218,37 @@ func main() {
 					fmt.Printf("after Process(): GOT Piece %d %d\n", pieceIdx, pieceOffset)
 
 					p.Uploaded_bytes += int64(len(buf))
-					/*
-						// Write to the file
-						f.WritePieceOffset(pieceIdx, int(pieceLength), pieceOffset, buf)
+/*
+					// Write to the file
+					f.WritePieceOffset(pieceIdx, int(pieceLength), pieceOffset, buf)
 
-						if f.IsPieceDownloaded(pieceIdx, int(pieceLength)) {
-							localState.PeersLock.Lock()
-							for i := range localState.Peers.List {
-								localState.Peers.List[i].Connection.SendHave(pieceIdx)
-								go func(p *peer.Peer) {
-									extra, _ := localState.Bitmap.HasExtraPieces(&p.Bitmap)
-									if !extra && p.Peer_interested {
-										p.UpdateInterested(false)
-										p.Connection.SendNotInterested()
-									} else if extra && !p.Peer_interested {
-										p.UpdateInterested(true)
-										p.Connection.SendInterested()
-									}
-								}(&localState.Peers.List[i])
-							}
-							localState.PeersLock.Unlock()
+					if f.IsPieceDownloaded(pieceIdx, int(pieceLength)) {
+						localState.PeersLock.Lock()
+						for i := range localState.Peers.List {
+							localState.Peers.List[i].Connection.SendHave(pieceIdx)
+							go func(p *peer.Peer) {
+								extra, _ := localState.Bitmap.HasExtraPieces(&p.Bitmap)
+								if !extra && p.Peer_interested {
+									p.UpdateInterested(false)
+									p.Connection.SendNotInterested()
+								} else if extra && !p.Peer_interested {
+									p.UpdateInterested(true)
+									p.Connection.SendInterested()
+								}
+							}(&localState.Peers.List[i])
 						}
-						extra, _ := localState.Bitmap.HasExtraPieces(&p.Bitmap)
-						if extra {
-							if !p.Am_interested {
-								p.UpdateInterested(true)
-								p.Connection.SendInterested()
-							}
-						} else {
-							p.UpdateInterested(false)
-							p.Connection.SendNotInterested()
-						}*/
+						localState.PeersLock.Unlock()
+					}
+					extra, _ := localState.Bitmap.HasExtraPieces(&p.Bitmap)
+					if extra {
+						if !p.Am_interested {
+							p.UpdateInterested(true)
+							p.Connection.SendInterested()
+						}
+					} else {
+						p.UpdateInterested(false)
+						p.Connection.SendNotInterested()
+					}*/
 				case comms.Request:
 					peer := localState.Peers.FindPeerByID(msg.PeerId)
 					if !localState.Bitmap.Pieces[int(pieceIdx)].Complete() || peer.Am_choking {
@@ -343,7 +343,7 @@ func main() {
 			var reqs_to_keep []int
 			for i, r := range localState.RequestQueue {
 				// Compare
-				if time.Now().Unix()-r.Timestamp > 5 {
+				if time.Now().Unix() - r.Timestamp > 5 {
 					localState.RequestQueue[i].Clean(&localState.Bitmap)
 				} else {
 					reqs_to_keep = append(reqs_to_keep, i)
@@ -526,28 +526,30 @@ func SortPeersAndUpdateTop4(localState *state.State) {
 	var newTop4 []*peer.Peer
 	for i := 0; i < len(localState.Peers.List); i++ {
 		if len(newTop4) == 4 {
-			break
-		}
-
-		localState.Peers.List[i].Peer_interested_lock.RLock()
-		localState.Peers.List[i].Peer_choking_lock.RLock()
-
-		if localState.Peers.List[i].Peer_interested || !localState.Peers.List[i].Peer_choking {
-			localState.Peers.List[i].Am_choking_lock.RLock()
-			if localState.Peers.List[i].Am_choking {
-				localState.Peers.List[i].Am_choking_lock.RUnlock()
-				localState.Peers.List[i].UpdateChoking(false)
-				localState.Peers.List[i].Connection.SendUnchoke()
-			} else {
-				localState.Peers.List[i].Am_choking_lock.RUnlock()
+			if(localState.Optimistic != &localState.Peers.List[i]) {
+				localState.Peers.List[i].UpdateChoking(true)
 			}
+		} else {
+			localState.Peers.List[i].Peer_interested_lock.RLock()
+			localState.Peers.List[i].Peer_choking_lock.RLock()
 
-			newTop4 = append(newTop4, &localState.Peers.List[i])
-		} else if(localState.Optimistic != &localState.Peers.List[i]) {
-			localState.Peers.List[i].UpdateChoking(true)
+			if localState.Peers.List[i].Peer_interested || !localState.Peers.List[i].Peer_choking {
+				localState.Peers.List[i].Am_choking_lock.RLock()
+				if localState.Peers.List[i].Am_choking {
+					localState.Peers.List[i].Am_choking_lock.RUnlock()
+					localState.Peers.List[i].UpdateChoking(false)
+					localState.Peers.List[i].Connection.SendUnchoke()
+				} else {
+					localState.Peers.List[i].Am_choking_lock.RUnlock()
+				}
+
+				newTop4 = append(newTop4, &localState.Peers.List[i])
+			} else if(localState.Optimistic != &localState.Peers.List[i]) {
+				localState.Peers.List[i].UpdateChoking(true)
+			}
+			localState.Peers.List[i].Peer_choking_lock.RUnlock()
+			localState.Peers.List[i].Peer_interested_lock.RUnlock()
 		}
-		localState.Peers.List[i].Peer_choking_lock.RUnlock()
-		localState.Peers.List[i].Peer_interested_lock.RUnlock()
 	}
 
 	localState.Top4 = newTop4

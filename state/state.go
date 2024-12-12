@@ -47,7 +47,6 @@ type State struct {
 	FileSize     int64
 	NumPieces    int
 	Info_hash    []byte
-	RN 			 int
 	Optimistic   *peer.Peer
 }
 
