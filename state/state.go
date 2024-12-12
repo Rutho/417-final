@@ -47,10 +47,6 @@ type State struct {
 	FileSize     int64
 	NumPieces    int
 	Info_hash    []byte
-<<<<<<< HEAD
-=======
-	RN           int
->>>>>>> 1bde810942f17e6ea9cd1ead51cac3ce74f61f8d
 }
 
 func (s State) String() string {
