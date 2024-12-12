@@ -208,10 +208,14 @@ func main() {
 
 					p := localState.Peers.FindPeerByID(msg.PeerId)
 
+					fmt.Printf("GOT Piece %d %d\n", pieceIdx, pieceOffset)
+
 					ok := receive.Process(&localState, pieceIdx, int64(pieceOffset), buf)
 					if !ok { // something went wrong (e.g. incorrect hash)
 						break
 					}
+
+					fmt.Printf("after Process(): GOT Piece %d %d\n", pieceIdx, pieceOffset)
 
 					p.Uploaded_bytes += int64(len(buf))
 					/*
@@ -515,6 +519,7 @@ func SortPeersAndUpdateTop4(localState *state.State) {
 	// Sort the peers in descending order of upload speed. Latest unchoked peer may be a replacement
 	sort.SliceStable(localState.Peers.List, func(i, j int) bool {
 		return (localState.Peers.List)[i].Uploaded_bytes > (localState.Peers.List)[j].Uploaded_bytes
+
 	})
 
 	// Update the top 4. Top4 stores pointers to Peer
