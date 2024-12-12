@@ -1,14 +1,13 @@
 package receive
 
 import (
-	"client/bitmap"
-	"client/state"
-	"client/request"
 	"bytes"
+	"client/bitmap"
+	"client/request"
+	"client/state"
 	"crypto/sha1"
 	"fmt"
 )
-
 
 func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bool {
 	// Description:
@@ -28,8 +27,8 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	}
 
 	// Update the block
-	s.RequestQueue[req_idx].Block.Buf        = buf
-	s.RequestQueue[req_idx].Block.Complete   = true
+	s.RequestQueue[req_idx].Block.Buf = buf
+	s.RequestQueue[req_idx].Block.Complete = true
 	s.RequestQueue[req_idx].Block.Incomplete = false
 
 	// Remove the Request from RequestQueue
