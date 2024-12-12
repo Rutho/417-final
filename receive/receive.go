@@ -4,13 +4,20 @@ import (
 	"client/bitmap"
 	"client/state"
 	"client/request"
+	"bytes"
+	"crypto/sha1"
 )
 
 
-func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) {
+func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bool {
 	// Description:
 	//
-	//   Handle the procedure upon receiving a Piece from a peeer
+	//   Handle the procedure upon receiving a Piece from a peer
+	//
+	// Returns:
+	//
+	//   false if the piece hash is incorrect
+	//   true otherwise
 
 	// Get Bitmap
 	b := s.Bitmap
@@ -36,12 +43,25 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) {
 	}
 
 	// Update the block
+	block.Buf = buf
 	block.Complete = true
 	block.Incomplete = false
 
 	// Update the piece
 	piece.Pending -= int64(len(buf))
 	piece.Progress += int64(len(buf))
+
+	// Check the hash of the piece if it's complete
+	ok := true
+	if piece.Complete() {
+		ok = VerifyPieceHash(s, Aggregate(piece), piece_index)
+		if !ok {
+			// Reset the piece
+			s.Bitmap.Pieces[piece_index].Blocks   = nil
+			s.Bitmap.Pieces[piece_index].Progress = 0
+			s.Bitmap.Pieces[piece_index].Pending  = 0
+		}
+	}
 
 	// Identify the corresponding Request
 	var req *request.Request = nil
@@ -64,4 +84,43 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) {
 
 	// Update the peer's upload rate
 	// req.Peer.Uploaded_bytes += int64(len(buf))
+	return ok
+}
+
+func Aggregate(p *bitmap.Piece) []byte {
+	// Combine all the blocks into a single byte array
+
+	var byteSlices [][]byte
+	for i := range p.Blocks {
+		byteSlices = append(byteSlices, p.Blocks[i].Buf)
+	}
+
+	return bytes.Join(byteSlices, nil)
+}
+
+func VerifyPieceHash(s *state.State, buf []byte, piece_index int) bool {
+	// Description:
+	//
+	//   Checks that the hashes match
+	//
+	// Returns:
+	//
+	//   true if they match
+	//   false if no match
+
+	// Get Bitmap
+	b := s.Bitmap
+
+	// Get Piece
+	piece := &b.Pieces[piece_index]
+
+	// Get expected hash
+	e_hash := piece.Hash
+
+	// Hash the received piece
+	h := sha1.New()
+	r_hash := h.Sum(buf)
+
+	// compare the hashes
+	return bytes.Equal(e_hash, r_hash)
 }

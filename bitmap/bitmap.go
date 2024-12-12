@@ -60,6 +60,7 @@ type Block struct {
 	//   Offset     : the byte offset into the piece
 	//   Length     : number of bytes this block is
 	//   Block_lock : for thread safety
+	//   Buf        : the actual data
 	//   Complete   : whether the block is received
 	//   Incomplete : whether the block is received
 
@@ -67,6 +68,8 @@ type Block struct {
 	Offset     int64
 	Length     int64
 	Block_lock *sync.RWMutex
+
+	Buf        []byte
 
 	Complete   bool
 	Incomplete bool

@@ -190,41 +190,59 @@ func main() {
 				pieceOffset := int(binary.BigEndian.Uint32(msg.Payload[4:8]))
 				switch msg.MsgType {
 				case comms.Piece:
+					// If we have all the pieces
 					if localState.Bitmap.AllDownloaded() {
 						break // ignore the piece
 					}
+					// If we have the piece
+					if localState.Bitmap.Pieces[int(pieceIdx)].PendingComplete() {
+						break // ignore the piece
+					}
+
 					//TODO: Update Peer's upload rate
 					//Either peer is sending us stuff willy-nilly or piece was completed
 					//between the time we sent a request message to this peer and we received the piece message from this peer
 					//Latter case only happens if we're sending multiple requests for the same block to different peers
 					//Should we include these messages for the calculation of peer's upload rate then? YES
+
+					buf := msg.Payload[8:]
+
+					// // If the piece isn't valid
+					// if receive.VerifyPieceHash(&localState, buf, pieceIdx) == false {
+					// 	break // ignore the piece
+					// }
+
 					p := localState.Peers.FindPeerByID(msg.PeerId)
-					fmt.Printf("Received a Piece from %s\n", p)
-					if localState.Bitmap.Pieces[int(pieceIdx)].Incomplete() {
-						buf := msg.Payload[8:]
-						p.Uploaded_bytes += int64(len(buf))
+					fmt.Printf("Received and validated Piece from %s\n", p)
 
-						f.WritePieceOffset(pieceIdx, int(pieceLength), pieceOffset, buf)
-						if f.IsPieceDownloaded(pieceIdx, int(pieceLength)) {
-							fmt.Printf("Process()\n")
+					fmt.Printf("Process()\n")
+					ok := receive.Process(&localState, pieceIdx, int64(pieceOffset), buf)
 
-							receive.Process(&localState, pieceIdx, int64(pieceOffset), buf)
-							localState.PeersLock.Lock()
-							for i := range localState.Peers.List {
-								localState.Peers.List[i].Connection.SendHave(pieceIdx)
-								go func(p *peer.Peer) {
-									extra, _ := localState.Bitmap.HasExtraPieces(&p.Bitmap)
-									if !extra && p.Peer_interested {
-										p.UpdateInterested(false)
-										p.Connection.SendNotInterested()
-									} else if extra && !p.Peer_interested {
-										p.UpdateInterested(true)
-										p.Connection.SendInterested()
-									}
-								}(&localState.Peers.List[i])
-							}
-							localState.PeersLock.Unlock()
+					if !ok { // incorrect hash
+						break
+					}
+
+					p.Uploaded_bytes += int64(len(buf))
+
+					// Write to the file
+					f.WritePieceOffset(pieceIdx, int(pieceLength), pieceOffset, buf)
+
+					if f.IsPieceDownloaded(pieceIdx, int(pieceLength)) {
+						localState.PeersLock.Lock()
+						for i := range localState.Peers.List {
+							localState.Peers.List[i].Connection.SendHave(pieceIdx)
+							go func(p *peer.Peer) {
+								extra, _ := localState.Bitmap.HasExtraPieces(&p.Bitmap)
+								if !extra && p.Peer_interested {
+									p.UpdateInterested(false)
+									p.Connection.SendNotInterested()
+								} else if extra && !p.Peer_interested {
+									p.UpdateInterested(true)
+									p.Connection.SendInterested()
+								}
+							}(&localState.Peers.List[i])
 						}
+						localState.PeersLock.Unlock()
 					}
 					extra, _ := localState.Bitmap.HasExtraPieces(&p.Bitmap)
 					if extra {

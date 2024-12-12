@@ -14,3 +14,6 @@
 !.vscode/extensions.json
 !.vscode/*.code-snippets
 .history
+
+# gigantic files
+debian-12.8.0-amd64-DVD-1.iso

@@ -265,6 +265,9 @@ func (s *State) SendARequest() bool {
 	b.Complete = false
 	b.Incomplete = true
 
+	// Add the block to the piece
+	s.Bitmap.Pieces[piece_index].Blocks = append(s.Bitmap.Pieces[piece_index].Blocks, *b)
+
 	// Increase pending bytes
 	s.Bitmap.Pieces[piece_index].Pending += b.Length
 
