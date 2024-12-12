@@ -24,34 +24,25 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	// Use it to find the request
 	req_idx := FindRequest(s.RequestQueue, piece_index, piece_offset, int64(len(buf)))
 	if req_idx == -1 {
-		fmt.Println("Received a block, but couldn't find the request I made for it?!")
+		fmt.Println("Received a block, but couldn't find the request I made for it. Ignoring.")
 		return false
 	}
 
 	// Did we already receive this block?
-	if s.RequestQueue[req_idx].Block.Buf != nil {
-		fmt.Println("Tried to write to a block that already has data??")
+	if s.RequestQueue[req_idx].Block.Complete {
+		fmt.Println("Received the same block again. Ignoring.")
 		return false
 	}
 
-	// Update the block
-	s.RequestQueue[req_idx].Block.Buf = append(s.RequestQueue[req_idx].Block.Buf, buf...)
+	// Write to the file
+	s.FM.WriteOffset(s.Bitmap.Pieces[piece_index].FileOffset + s.RequestQueue[req_idx].Block.Offset, buf)
 
+	// Update the block
 	s.RequestQueue[req_idx].Block.Complete = true
 	s.RequestQueue[req_idx].Block.Pending = false
 	s.RequestQueue[req_idx].Block.Incomplete = false
 	// Get Piece
 	piece := &s.Bitmap.Pieces[piece_index]
-
-	// Update the block again for good measure (???)
-	for i := range s.Bitmap.Pieces[piece_index].Blocks {
-		if s.Bitmap.Pieces[piece_index].Blocks[i].Equals(s.RequestQueue[req_idx].Block) {
-			// if s.Bitmap.Pieces[piece_index].Blocks[i].Buf != nil {
-			// fmt.Println("it's already got data.")
-			// }
-			copy(s.Bitmap.Pieces[piece_index].Blocks[i].Buf, buf)
-		}
-	}
 
 	// Remove the Request from RequestQueue
 	s.RequestQueue[req_idx] = s.RequestQueue[len(s.RequestQueue)-1]
@@ -63,17 +54,7 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	// Check the hash of the piece if it's complete
 	ok := true
 	if s.Bitmap.Pieces[piece_index].Complete() {
-		// fmt.Printf("Piece %d fully downloaded, verifying hash...\n", piece_index)
-		// for _, b := range s.Bitmap.Pieces[piece_index].Blocks {
-		// 	fmt.Printf("%s ", b)
-		// 	if b.Buf == nil {
-		// 		// panic("Block has no data!?")
-		// 		fmt.Printf("<-NO DATA ")
-		// 	}
-		// }
-		// fmt.Printf("\n")
-
-		ok = VerifyPieceHash(s, Aggregate(piece), piece_index)
+		ok = VerifyPieceHash(s, Aggregate(s, piece), piece_index)
 		if !ok {
 			// Reset the piece
 			s.Bitmap.Pieces[piece_index].Reset()
@@ -89,11 +70,18 @@ func Process(s *state.State, piece_index int, piece_offset int64, buf []byte) bo
 	return ok
 }
 
-func Aggregate(p *bitmap.Piece) []byte {
+func Aggregate(s *state.State, p *bitmap.Piece) []byte {
 	// Combine all the blocks into a single byte array
 
 	var byteSlices [][]byte
 	for i := range p.Blocks {
+
+		ReadFromFile(s, p, &p.Blocks[i])
+
+		if p.Blocks[i].Buf == nil {
+			panic("trrying to hash but block has no data!")
+		}
+
 		byteSlices = append(byteSlices, p.Blocks[i].Buf)
 	}
 
@@ -134,8 +122,8 @@ func PieceCompleted(s *state.State, piece_index int) {
 		s.Peers.List[i].Connection.SendHave(uint32(piece_index))
 	}
 
-	// Write the piece to the file
-	s.FM.WriteOffset(s.Bitmap.Pieces[piece_index].FileOffset, Aggregate(&s.Bitmap.Pieces[piece_index]))
+	// // Write the piece to the file
+	// s.FM.WriteOffset(s.Bitmap.Pieces[piece_index].FileOffset, Aggregate(s, &s.Bitmap.Pieces[piece_index]))
 
 	// Release the memory associated with the piece
 	for i := range s.Bitmap.Pieces[piece_index].Blocks {
@@ -158,4 +146,16 @@ func FindRequest(rq []request.Request, idx int, offset int64, length int64) int 
 		}
 	}
 	return -1
+}
+
+func ReadFromFile(s *state.State, p *bitmap.Piece, b *bitmap.Block) {
+	// Read the stored data from the file into the block's buffer
+
+	if b.Incomplete {
+		// We didn't write to the file
+		return
+	}
+
+	// Read from file -> buf
+	b.Buf, _, _ = s.FM.ReadOffset(p.FileOffset + b.Offset, uint32(len(b.Buf)))
 }

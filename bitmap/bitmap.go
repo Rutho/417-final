@@ -60,8 +60,9 @@ type Block struct {
 	//   Offset     : the byte offset into the piece
 	//   Length     : number of bytes this block is
 	//   Block_lock : for thread safety
-	//   Buf        : the actual data
+	//   Buf        : the actual data. Most of the time, is stored elsewhere (disk). Only stored here temporarily for processing (e.g. hash verification)
 	//   Complete   : whether the block is received
+	//   Pending    : whether this block is requested and waiting for data
 	//   Incomplete : whether the block is received
 
 	PieceIndex int
@@ -614,3 +615,4 @@ func (p *Piece) New(idx int, length int64, hash []byte, file_offset int64) {
 		tlen -= curr_b_len
 	}
 }
+
