@@ -48,6 +48,7 @@ type State struct {
 	NumPieces    int
 	Info_hash    []byte
 	Optimistic   *peer.Peer
+	Seeder       bool
 }
 
 func (s State) String() string {
@@ -231,6 +232,7 @@ func (s *State) SendARequest() bool {
 
 	if s.Bitmap.AllDownloaded() {
 		fmt.Println("Tried to SendARequest() but all pieces are downloaded")
+		s.Seeder = true
 		return true
 	}
 
